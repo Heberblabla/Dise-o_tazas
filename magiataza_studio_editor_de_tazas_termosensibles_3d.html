@@ -1,0 +1,3632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MagiaTaza Studio — Editor de Tazas Termosensibles 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;700;800&family=Oswald:wght@500;700&family=Pacifico&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+      overflow-x: hidden;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Custom range sliders */
+    input[type="range"].thermo-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #1e293b 0%, #3b82f6 35%, #f59e0b 70%, #ef4444 100%);
+      outline: none;
+    }
+    input[type="range"].thermo-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #ea580c;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+    }
+    input[type="range"].thermo-slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #ea580c;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+    }
+
+    .checker-bg {
+      background-image:
+        linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+        linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+        linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    }
+
+    .stage-radial {
+      background: radial-gradient(circle at 50% 42%, #ffffff 0%, #f1f5f9 58%, #e2e8f0 100%);
+    }
+
+    @keyframes pulseSoft {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+    .animate-pulse-soft { animation: pulseSoft 1.8s ease-in-out infinite; }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-100 text-slate-900 select-none">
+
+  <!-- TOP BAR -->
+  <header class="h-14 bg-white border-b border-slate-200 px-3 lg:px-4 flex items-center justify-between gap-2 shrink-0 z-30 shadow-sm">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-orange-500 flex items-center justify-center text-white shrink-0 shadow-sm">
+        <i data-lucide="coffee" class="w-4 h-4"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-bold tracking-tight text-slate-900 truncate">MagiaTaza Studio</h1>
+          <span id="autosaveBadge" class="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Guardado
+          </span>
+        </div>
+        <input id="projectTitleInput" type="text" value="Taza Mágica — Demo Regalo" aria-label="Nombre del proyecto"
+          class="text-xs text-slate-500 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none focus:text-slate-800 w-40 sm:w-56 truncate" />
+      </div>
+    </div>
+
+    <!-- Center Actions (Desktop) -->
+    <div class="hidden md:flex items-center gap-1.5">
+      <button id="btnNewProject" type="button" title="Nuevo proyecto o demo"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 transition">
+        <i data-lucide="file-plus" class="w-3.5 h-3.5"></i>
+        <span>Nuevo</span>
+      </button>
+      <button id="btnImportJson" type="button" title="Importar proyecto (.json)"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 border border-slate-200 transition">
+        <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+        <span>Importar</span>
+      </button>
+      <button id="btnOpenExportModal" type="button" title="Exportar proyecto, PNGs y plantilla"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-sm">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span>Exportar</span>
+      </button>
+
+      <div class="w-px h-5 bg-slate-200 mx-1"></div>
+
+      <button id="btnUndo" type="button" title="Deshacer (Ctrl+Z)"
+        class="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-35 disabled:pointer-events-none transition">
+        <i data-lucide="undo-2" class="w-4 h-4"></i>
+      </button>
+      <button id="btnRedo" type="button" title="Rehacer (Ctrl+Y)"
+        class="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-35 disabled:pointer-events-none transition">
+        <i data-lucide="redo-2" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Right Mode Switch + Mobile Menu -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button id="btnReviewBadge" type="button" title="Ver comentarios del cliente"
+        class="hidden items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition">
+        <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+        <span id="reviewBadgeCount">0</span>
+      </button>
+
+      <div class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200" role="group" aria-label="Modo de uso">
+        <button id="btnModeDesigner" type="button"
+          class="px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-indigo-700 shadow-sm transition flex items-center gap-1">
+          <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Diseñador</span>
+        </button>
+        <button id="btnModeClient" type="button"
+          class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Modo Cliente</span>
+        </button>
+      </div>
+
+      <button id="btnMobileMenu" type="button" aria-label="Menú de acciones"
+        class="md:hidden p-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100">
+        <i data-lucide="menu" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mobile Top Actions Dropdown -->
+  <div id="mobileActionBar" class="hidden md:hidden bg-white border-b border-slate-200 px-3 py-2 flex flex-wrap items-center gap-2 z-20">
+    <button id="mBtnNew" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 flex items-center gap-1">
+      <i data-lucide="file-plus" class="w-3.5 h-3.5"></i> Nuevo
+    </button>
+    <button id="mBtnImport" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 flex items-center gap-1">
+      <i data-lucide="upload" class="w-3.5 h-3.5"></i> Importar
+    </button>
+    <button id="mBtnExport" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white flex items-center gap-1">
+      <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar
+    </button>
+    <button id="mBtnUndo" type="button" class="px-2 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-700">
+      <i data-lucide="undo-2" class="w-3.5 h-3.5"></i>
+    </button>
+    <button id="mBtnRedo" type="button" class="px-2 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-700">
+      <i data-lucide="redo-2" class="w-3.5 h-3.5"></i>
+    </button>
+  </div>
+
+  <!-- Hidden file inputs -->
+  <input id="fileInputImage" type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden" />
+  <input id="fileInputJson" type="file" accept=".json,application/json" class="hidden" />
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex overflow-hidden relative min-h-0">
+
+    <!-- LEFT PANEL (Tools & Layers — hidden in Client Mode) -->
+    <aside id="leftPanel" class="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0 z-20 hidden lg:flex">
+      <!-- Tool Tabs -->
+      <div class="grid grid-cols-5 border-b border-slate-200 bg-slate-50/70 p-1 gap-1" role="tablist">
+        <button data-left-tab="images" type="button" class="left-tab-btn flex flex-col items-center justify-center py-2 rounded-lg text-[10px] font-semibold bg-white text-indigo-700 shadow-sm border border-slate-200/80">
+          <i data-lucide="image" class="w-4 h-4 mb-0.5"></i>
+          <span>Imagen</span>
+        </button>
+        <button data-left-tab="text" type="button" class="left-tab-btn flex flex-col items-center justify-center py-2 rounded-lg text-[10px] font-medium text-slate-600 hover:bg-white/70">
+          <i data-lucide="type" class="w-4 h-4 mb-0.5"></i>
+          <span>Texto</span>
+        </button>
+        <button data-left-tab="qr" type="button" class="left-tab-btn flex flex-col items-center justify-center py-2 rounded-lg text-[10px] font-medium text-slate-600 hover:bg-white/70">
+          <i data-lucide="qr-code" class="w-4 h-4 mb-0.5"></i>
+          <span>QR</span>
+        </button>
+        <button data-left-tab="shapes" type="button" class="left-tab-btn flex flex-col items-center justify-center py-2 rounded-lg text-[10px] font-medium text-slate-600 hover:bg-white/70">
+          <i data-lucide="shapes" class="w-4 h-4 mb-0.5"></i>
+          <span>Figuras</span>
+        </button>
+        <button data-left-tab="layers" type="button" class="left-tab-btn flex flex-col items-center justify-center py-2 rounded-lg text-[10px] font-medium text-slate-600 hover:bg-white/70">
+          <i data-lucide="layers" class="w-4 h-4 mb-0.5"></i>
+          <span>Capas</span>
+        </button>
+      </div>
+
+      <!-- Tab Contents -->
+      <div class="flex-1 overflow-y-auto custom-scroll p-3.5 space-y-4">
+
+        <!-- TAB: IMAGES -->
+        <div id="tabImages" class="left-tab-pane space-y-3">
+          <div>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Subir Imágenes</h2>
+            <button id="btnUploadImage" type="button"
+              class="w-full py-5 px-3 border-2 border-dashed border-indigo-300 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl flex flex-col items-center justify-center gap-1.5 text-indigo-700 transition cursor-pointer">
+              <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+              <span class="text-xs font-semibold">Seleccionar PNG, JPG o WebP</span>
+              <span class="text-[11px] text-slate-500">Se optimizan automáticamente</span>
+            </button>
+          </div>
+
+          <div class="pt-2 border-t border-slate-100">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Stickers Rápidos</h3>
+            <div class="grid grid-cols-3 gap-2" id="quickStickersGrid">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
+            <strong class="text-slate-800">Consejo:</strong> Puedes subir varias imágenes. Todas quedan incrustadas en el archivo <code class="text-indigo-700">.json</code> al exportar.
+          </div>
+        </div>
+
+        <!-- TAB: TEXT -->
+        <div id="tabText" class="left-tab-pane hidden space-y-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Agregar Texto</h2>
+          <textarea id="newTextInput" rows="2" placeholder="Escribe tu frase aquí..."
+            class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none">¡Eres increíble!</textarea>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Fuente</label>
+              <select id="newTextFont" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs bg-white">
+                <option value="Montserrat">Montserrat</option>
+                <option value="Pacifico">Pacifico (Script)</option>
+                <option value="Playfair Display">Playfair (Elegante)</option>
+                <option value="Oswald">Oswald (Impacto)</option>
+                <option value="Inter">Inter (Moderna)</option>
+                <option value="Roboto Mono">Roboto Mono</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Color</label>
+              <div class="flex items-center gap-1.5">
+                <input id="newTextColor" type="color" value="#1e293b" class="w-8 h-8 rounded cursor-pointer border border-slate-300" />
+                <span id="newTextColorHex" class="text-xs font-mono text-slate-600">#1e293b</span>
+              </div>
+            </div>
+          </div>
+          <button id="btnAddText" type="button"
+            class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Agregar texto a la taza
+          </button>
+
+          <div class="pt-2 border-t border-slate-100 space-y-1.5">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Estilos Predefinidos</h3>
+            <button type="button" data-preset-text="¡Feliz Cumpleaños!" data-preset-font="Pacifico" data-preset-color="#db2777"
+              class="preset-text-btn w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 transition" style="font-family: 'Pacifico', cursive; color: #db2777;">
+              ¡Feliz Cumpleaños!
+            </button>
+            <button type="button" data-preset-text="CAFÉ & MAGIA" data-preset-font="Oswald" data-preset-color="#0f172a"
+              class="preset-text-btn w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 transition font-bold tracking-wider" style="font-family: 'Oswald', sans-serif;">
+              CAFÉ &amp; MAGIA
+            </button>
+            <button type="button" data-preset-text="Para alguien especial" data-preset-font="Playfair Display" data-preset-color="#7c2d12"
+              class="preset-text-btn w-full text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 transition italic" style="font-family: 'Playfair Display', serif; color: #7c2d12;">
+              Para alguien especial
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB: QR CODE -->
+        <div id="tabQr" class="left-tab-pane hidden space-y-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Generador de Código QR Real</h2>
+
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-1">Tipo de contenido</label>
+            <select id="qrTypeSelect" class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white">
+              <option value="url">Sitio Web / Enlace</option>
+              <option value="whatsapp">Enlace de WhatsApp</option>
+              <option value="social">Red Social (Instagram / TikTok)</option>
+              <option value="text">Texto personalizado</option>
+            </select>
+          </div>
+
+          <!-- Dynamic inputs for QR -->
+          <div id="qrFieldStandard">
+            <label id="qrInputLabel" class="block text-[11px] font-medium text-slate-600 mb-1">URL del sitio web</label>
+            <input id="qrContentInput" type="text" value="https://instagram.com/tu_tienda" placeholder="https://ejemplo.com"
+              class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:outline-none" />
+          </div>
+
+          <div id="qrFieldWhatsapp" class="hidden space-y-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Número con código país (sin +)</label>
+              <input id="qrWaPhone" type="text" value="51999888777" placeholder="51999888777"
+                class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Mensaje inicial (opcional)</label>
+              <input id="qrWaMsg" type="text" value="Hola, quiero pedir una taza mágica!" placeholder="Hola..."
+                class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Color código</label>
+              <input id="qrFgColor" type="color" value="#0f172a" class="w-full h-8 rounded cursor-pointer border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Fondo QR</label>
+              <input id="qrBgColor" type="color" value="#ffffff" class="w-full h-8 rounded cursor-pointer border border-slate-300" />
+            </div>
+          </div>
+
+          <!-- Contrast Check & Preview -->
+          <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center gap-2">
+            <canvas id="qrPreviewCanvas" width="140" height="140" class="rounded-lg shadow-sm border border-slate-200 bg-white"></canvas>
+            <div id="qrContrastStatus" class="text-[11px] font-medium text-emerald-700 text-center">
+              Contraste: 18.1:1 — Óptimo para escaneo
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnAddQrToMug" type="button"
+              class="py-2 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-sm">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              Colocar en taza
+            </button>
+            <button id="btnDownloadQr" type="button"
+              class="py-2 px-2.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center justify-center gap-1 transition">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              Descargar PNG
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB: SHAPES -->
+        <div id="tabShapes" class="left-tab-pane hidden space-y-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Figuras Decorativas</h2>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Relleno</label>
+              <input id="newShapeFill" type="color" value="#f43f5e" class="w-full h-8 rounded cursor-pointer border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-1">Borde</label>
+              <input id="newShapeStroke" type="color" value="#ffffff" class="w-full h-8 rounded cursor-pointer border border-slate-300" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2" id="shapesButtonsGrid">
+            <button type="button" data-shape="heart" class="shape-add-btn p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 flex flex-col items-center gap-1 text-xs font-medium text-slate-700 transition">
+              <i data-lucide="heart" class="w-5 h-5 text-rose-500"></i>
+              <span>Corazón</span>
+            </button>
+            <button type="button" data-shape="star" class="shape-add-btn p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 flex flex-col items-center gap-1 text-xs font-medium text-slate-700 transition">
+              <i data-lucide="star" class="w-5 h-5 text-amber-500"></i>
+              <span>Estrella</span>
+            </button>
+            <button type="button" data-shape="circle" class="shape-add-btn p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 flex flex-col items-center gap-1 text-xs font-medium text-slate-700 transition">
+              <i data-lucide="circle" class="w-5 h-5 text-indigo-500"></i>
+              <span>Círculo</span>
+            </button>
+            <button type="button" data-shape="roundedRect" class="shape-add-btn p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 flex flex-col items-center gap-1 text-xs font-medium text-slate-700 transition">
+              <i data-lucide="square" class="w-5 h-5 text-emerald-500"></i>
+              <span>Etiqueta</span>
+            </button>
+            <button type="button" data-shape="ribbon" class="shape-add-btn p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 flex flex-col items-center gap-1 text-xs font-medium text-slate-700 transition">
+              <i data-lucide="bookmark" class="w-5 h-5 text-violet-500"></i>
+              <span>Cinta</span>
+            </button>
+            <button type="button" data-shape="sparkle" class="shape-add-btn p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 flex flex-col items-center gap-1 text-xs font-medium text-slate-700 transition">
+              <i data-lucide="sparkles" class="w-5 h-5 text-orange-500"></i>
+              <span>Destello</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB: LAYERS -->
+        <div id="tabLayers" class="left-tab-pane hidden space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Capas del Diseño</h2>
+            <span id="layerCountLabel" class="text-[11px] text-slate-400 font-medium">0 capas</span>
+          </div>
+          <div id="layersList" class="space-y-1.5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- CENTER STAGE -->
+    <main class="flex-1 flex flex-col min-w-0 bg-slate-100 relative overflow-hidden">
+
+      <!-- Stage Top Control Bar -->
+      <div class="bg-white/90 backdrop-blur border-b border-slate-200 px-3 py-2 flex flex-wrap items-center justify-between gap-2 z-10">
+        <!-- View Mode Toggle -->
+        <div class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+          <button id="btnView3D" type="button" class="view-mode-btn px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-indigo-700 shadow-sm flex items-center gap-1">
+            <i data-lucide="box" class="w-3.5 h-3.5"></i>
+            <span>Taza 3D</span>
+          </button>
+          <button id="btnView2D" type="button" class="view-mode-btn px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1">
+            <i data-lucide="layout-template" class="w-3.5 h-3.5"></i>
+            <span>Plantilla 2D</span>
+          </button>
+          <button id="btnViewSplit" type="button" class="view-mode-btn hidden sm:inline-flex px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 items-center gap-1">
+            <i data-lucide="columns-2" class="w-3.5 h-3.5"></i>
+            <span>Dividida</span>
+          </button>
+        </div>
+
+        <!-- 3D Camera Quick Angles -->
+        <div id="cameraControlsBar" class="flex items-center gap-1 flex-wrap">
+          <button type="button" data-angle="front" class="cam-angle-btn px-2 py-1 rounded-md text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition">Frente</button>
+          <button type="button" data-angle="left" class="cam-angle-btn px-2 py-1 rounded-md text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition">Izq.</button>
+          <button type="button" data-angle="right" class="cam-angle-btn px-2 py-1 rounded-md text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition">Der.</button>
+          <button type="button" data-angle="back" class="cam-angle-btn px-2 py-1 rounded-md text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition">Asa</button>
+          <div class="w-px h-4 bg-slate-200 mx-0.5"></div>
+          <button id="btnAutoRotate" type="button" title="Girar automáticamente"
+            class="p-1.5 rounded-md text-slate-600 hover:bg-slate-200 bg-slate-100 transition">
+            <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+          </button>
+          <button id="btnZoomIn" type="button" title="Acercar" class="p-1.5 rounded-md text-slate-600 hover:bg-slate-200 bg-slate-100 transition">
+            <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
+          </button>
+          <button id="btnZoomOut" type="button" title="Alejar" class="p-1.5 rounded-md text-slate-600 hover:bg-slate-200 bg-slate-100 transition">
+            <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Canvas Area (3D and/or 2D) -->
+      <div id="stageContainer" class="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+
+        <!-- 3D VIEWPORT -->
+        <div id="viewport3DWrap" class="flex-1 relative stage-radial min-h-0 flex items-center justify-center overflow-hidden">
+          <div id="threeContainer" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+          <!-- Simulation Notice Pill -->
+          <div class="absolute top-3 left-3 pointer-events-none flex flex-col gap-1.5 max-w-[260px]">
+            <div id="thermoStatePill" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-900/85 text-white shadow-sm backdrop-blur w-fit">
+              <span id="thermoDot" class="w-2 h-2 rounded-full bg-sky-400"></span>
+              <span id="thermoStateText">Fría (0% • 20°C)</span>
+            </div>
+            <span class="text-[10px] text-slate-500 bg-white/80 backdrop-blur px-2 py-0.5 rounded-md border border-slate-200/80 shadow-xs">
+              Simulación visual — no predice el comportamiento físico exacto de la tinta.
+            </span>
+          </div>
+
+          <!-- Interaction Hint -->
+          <div class="absolute bottom-3 left-3 pointer-events-none hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 bg-white/75 backdrop-blur px-2.5 py-1 rounded-full border border-slate-200/70">
+            <i data-lucide="move" class="w-3 h-3"></i>
+            <span>Arrastra para girar 360° • Rueda para zoom</span>
+          </div>
+        </div>
+
+        <!-- 2D FLAT PRINT TEMPLATE VIEWPORT -->
+        <div id="viewport2DWrap" class="hidden flex-1 flex-col bg-slate-200/70 border-t border-slate-300 min-h-0 overflow-hidden relative">
+          <div class="px-3 py-1.5 bg-white/90 border-b border-slate-200 flex items-center justify-between text-[11px] shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-slate-700">Plantilla Plana de Impresión</span>
+              <span id="printDimsBadge" class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-[10px] border border-indigo-200">200 × 85 mm</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="inline-flex items-center gap-1 text-slate-600 cursor-pointer">
+                <input id="chkShowGuides" type="checkbox" checked class="rounded text-indigo-600" />
+                <span>Guías</span>
+              </label>
+              <span class="text-[10px] text-slate-500 hidden sm:inline">Archivo de impresión (sin capa negra)</span>
+            </div>
+          </div>
+
+          <div id="editor2DScroll" class="flex-1 flex items-center justify-center p-4 overflow-auto custom-scroll">
+            <div class="relative shadow-lg rounded-sm bg-white p-1.5 border border-slate-300 max-w-full">
+              <canvas id="editor2DCanvas" class="block max-w-full h-auto cursor-default touch-none"></canvas>
+            </div>
+          </div>
+
+          <div class="px-3 py-1 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500 shrink-0">
+            <span>← Izquierda del asa</span>
+            <span class="font-semibold text-indigo-700">Centro (Frente de la taza)</span>
+            <span>Derecha del asa →</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- THERMOSENSITIVE CONTROL BAR (Bottom of Center Stage) -->
+      <div class="bg-white border-t border-slate-200 px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-10">
+        <div class="flex items-center gap-2">
+          <button id="btnSetCold" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="snowflake" class="w-3.5 h-3.5 text-sky-300"></i>
+            <span>Fría</span>
+          </button>
+          <button id="btnSetHot" type="button"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600 transition flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-200"></i>
+            <span>Caliente</span>
+          </button>
+        </div>
+
+        <div class="flex-1 min-w-[180px] max-w-md flex items-center gap-2.5">
+          <span class="text-[11px] font-semibold text-slate-500 whitespace-nowrap">Temp.</span>
+          <input id="thermoSlider" type="range" min="0" max="100" value="75" class="thermo-slider flex-1 cursor-pointer" aria-label="Nivel de temperatura" />
+          <span id="thermoPercentLabel" class="text-xs font-bold font-mono text-orange-600 w-10 text-right">75%</span>
+        </div>
+
+        <button id="btnAnimateThermo" type="button"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition flex items-center gap-1.5">
+          <i id="animateIcon" data-lucide="play" class="w-3.5 h-3.5"></i>
+          <span id="animateLabel">Animar cambio</span>
+        </button>
+      </div>
+
+      <!-- MOBILE PANEL SWITCHER (Bottom bar on small screens) -->
+      <div id="mobileBottomNav" class="lg:hidden bg-white border-t border-slate-200 grid grid-cols-3 text-xs font-medium shrink-0">
+        <button id="mNavTools" type="button" class="py-2.5 flex items-center justify-center gap-1.5 text-slate-600 border-r border-slate-100">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Herramientas</span>
+        </button>
+        <button id="mNavStage" type="button" class="py-2.5 flex items-center justify-center gap-1.5 text-indigo-700 font-semibold bg-indigo-50/50 border-r border-slate-100">
+          <i data-lucide="coffee" class="w-4 h-4"></i>
+          <span>Vista Taza</span>
+        </button>
+        <button id="mNavProps" type="button" class="py-2.5 flex items-center justify-center gap-1.5 text-slate-600">
+          <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          <span id="mNavPropsLabel">Propiedades</span>
+        </button>
+      </div>
+    </main>
+
+    <!-- RIGHT PANEL: DESIGNER PROPERTIES (hidden in Client Mode) -->
+    <aside id="rightPanelDesigner" class="w-72 bg-white border-l border-slate-200 flex-col shrink-0 z-20 hidden lg:flex overflow-y-auto custom-scroll">
+
+      <!-- Selected Element Properties -->
+      <div id="selectedElementPanel" class="p-3.5 border-b border-slate-200 space-y-3 hidden">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+            <span id="propElementTypeTitle">Elemento</span>
+          </h2>
+          <div class="flex items-center gap-1">
+            <button id="btnDuplicateEl" type="button" title="Duplicar" class="p-1 rounded hover:bg-slate-100 text-slate-600">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+            <button id="btnDeleteEl" type="button" title="Eliminar" class="p-1 rounded hover:bg-rose-50 text-rose-600">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Text-specific controls -->
+        <div id="propTextSection" class="hidden space-y-2">
+          <label class="block text-[11px] font-medium text-slate-600">Contenido</label>
+          <textarea id="propTextValue" rows="2" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"></textarea>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Fuente</label>
+              <select id="propTextFont" class="w-full rounded-lg border border-slate-300 px-1.5 py-1 text-xs bg-white">
+                <option value="Montserrat">Montserrat</option>
+                <option value="Pacifico">Pacifico</option>
+                <option value="Playfair Display">Playfair</option>
+                <option value="Oswald">Oswald</option>
+                <option value="Inter">Inter</option>
+                <option value="Roboto Mono">Roboto Mono</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Color</label>
+              <input id="propTextColor" type="color" class="w-full h-7 rounded border border-slate-300 cursor-pointer" />
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button id="propTextBold" type="button" class="flex-1 py-1 rounded border border-slate-300 text-xs font-bold hover:bg-slate-100">Negrita</button>
+            <button id="propTextItalic" type="button" class="flex-1 py-1 rounded border border-slate-300 text-xs italic hover:bg-slate-100">Cursiva</button>
+          </div>
+        </div>
+
+        <!-- Shape-specific controls -->
+        <div id="propShapeSection" class="hidden grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Relleno</label>
+            <input id="propShapeFill" type="color" class="w-full h-7 rounded border border-slate-300 cursor-pointer" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Borde</label>
+            <input id="propShapeStroke" type="color" class="w-full h-7 rounded border border-slate-300 cursor-pointer" />
+          </div>
+        </div>
+
+        <!-- QR-specific controls -->
+        <div id="propQrSection" class="hidden space-y-2">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Enlace / Texto del QR</label>
+            <input id="propQrData" type="text" class="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Módulos</label>
+              <input id="propQrFg" type="color" class="w-full h-7 rounded border border-slate-300 cursor-pointer" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Fondo</label>
+              <input id="propQrBg" type="color" class="w-full h-7 rounded border border-slate-300 cursor-pointer" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Transform Controls -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Posición X (%)</label>
+            <input id="propX" type="number" min="0" max="100" step="1" class="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Posición Y (%)</label>
+            <input id="propY" type="number" min="0" max="100" step="1" class="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-[11px] font-medium text-slate-600 mb-0.5">
+            <span>Tamaño</span>
+            <span id="propScaleVal" class="font-mono">100%</span>
+          </div>
+          <input id="propScale" type="range" min="15" max="260" value="100" class="w-full accent-indigo-600" />
+        </div>
+
+        <div>
+          <div class="flex justify-between text-[11px] font-medium text-slate-600 mb-0.5">
+            <span>Rotación</span>
+            <span id="propRotVal" class="font-mono">0°</span>
+          </div>
+          <input id="propRotation" type="range" min="-180" max="180" value="0" class="w-full accent-indigo-600" />
+        </div>
+
+        <div>
+          <div class="flex justify-between text-[11px] font-medium text-slate-600 mb-0.5">
+            <span>Opacidad</span>
+            <span id="propOpacityVal" class="font-mono">100%</span>
+          </div>
+          <input id="propOpacity" type="range" min="10" max="100" value="100" class="w-full accent-indigo-600" />
+        </div>
+
+        <!-- Thermosensitive Visibility Toggle -->
+        <div class="p-2.5 rounded-lg bg-slate-900 text-white space-y-1">
+          <label class="flex items-center justify-between gap-2 cursor-pointer">
+            <span class="text-xs font-medium flex items-center gap-1.5">
+              <i data-lucide="snowflake" class="w-3.5 h-3.5 text-sky-400"></i>
+              Visible en taza fría
+            </span>
+            <input id="propVisibleCold" type="checkbox" class="w-4 h-4 rounded accent-sky-400 cursor-pointer" />
+          </label>
+          <p class="text-[10px] text-slate-300 leading-snug">
+            Actívalo si este elemento debe verse incluso antes de calentar la taza.
+          </p>
+        </div>
+
+        <!-- Layer Order & Quick Align -->
+        <div class="grid grid-cols-3 gap-1.5 pt-1">
+          <button id="btnLayerUp" type="button" class="py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-[11px] font-medium flex items-center justify-center gap-1">
+            <i data-lucide="arrow-up" class="w-3 h-3"></i> Subir
+          </button>
+          <button id="btnLayerDown" type="button" class="py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-[11px] font-medium flex items-center justify-center gap-1">
+            <i data-lucide="arrow-down" class="w-3 h-3"></i> Bajar
+          </button>
+          <button id="btnCenterEl" type="button" class="py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-[11px] font-medium flex items-center justify-center gap-1">
+            <i data-lucide="align-center-horizontal" class="w-3 h-3"></i> Centrar
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty selection helper -->
+      <div id="noSelectionNotice" class="p-4 border-b border-slate-200 text-center bg-slate-50/70">
+        <p class="text-xs text-slate-500">
+          Selecciona un elemento en la <strong>Plantilla 2D</strong> o en la pestaña <strong>Capas</strong> para editar sus propiedades.
+        </p>
+      </div>
+
+      <!-- MUG CONFIGURATION -->
+      <div class="p-3.5 space-y-3">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+          <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
+          <span>Configuración de la Taza</span>
+        </h2>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-600 mb-1">Modelo / Zona imprimible</label>
+          <select id="mugPresetSelect" class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs bg-white">
+            <option value="200x85">11 oz Estándar (200 × 85 mm)</option>
+            <option value="210x95">11 oz Amplia (210 × 95 mm)</option>
+            <option value="220x105">15 oz Grande (220 × 105 mm)</option>
+            <option value="custom">Personalizado (mm)</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Ancho (mm)</label>
+            <input id="mugWidthMm" type="number" min="120" max="250" value="200" class="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Alto (mm)</label>
+            <input id="mugHeightMm" type="number" min="50" max="125" value="85" class="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-1">Fondo diseño</label>
+            <input id="mugBgColor" type="color" value="#fffdf9" class="w-full h-8 rounded cursor-pointer border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-600 mb-1">Interior y asa</label>
+            <input id="mugInteriorColor" type="color" value="#ffffff" class="w-full h-8 rounded cursor-pointer border border-slate-300" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-600 mb-1">Color capa termosensible (fría)</label>
+          <div class="flex items-center gap-1.5">
+            <button type="button" data-coat="#141419" class="coat-swatch w-7 h-7 rounded-full border-2 border-indigo-600 shadow-sm" style="background:#141419" title="Negro Mágico"></button>
+            <button type="button" data-coat="#0f1d3a" class="coat-swatch w-7 h-7 rounded-full border-2 border-slate-200 shadow-sm" style="background:#0f1d3a" title="Azul Noche"></button>
+            <button type="button" data-coat="#3d0f18" class="coat-swatch w-7 h-7 rounded-full border-2 border-slate-200 shadow-sm" style="background:#3d0f18" title="Vino Tinto"></button>
+            <button type="button" data-coat="#102b20" class="coat-swatch w-7 h-7 rounded-full border-2 border-slate-200 shadow-sm" style="background:#102b20" title="Verde Bosque"></button>
+            <input id="mugColdCoatColor" type="color" value="#141419" class="w-8 h-7 rounded border border-slate-300 cursor-pointer ml-auto" title="Color personalizado" />
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT PANEL: CLIENT REVIEW MODE -->
+    <aside id="rightPanelClient" class="hidden w-80 bg-white border-l border-slate-200 flex-col shrink-0 z-20 overflow-y-auto custom-scroll">
+      <div class="p-4 bg-gradient-to-br from-indigo-50 to-white border-b border-slate-200">
+        <div class="flex items-center gap-2 text-indigo-700 mb-1">
+          <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+          <h2 class="text-sm font-bold">Revisión del Cliente</h2>
+        </div>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Gira la taza y prueba el control de temperatura abajo. En este modo el diseño está protegido contra cambios accidentales.
+        </p>
+      </div>
+
+      <div class="p-4 space-y-4 flex-1">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Tu nombre (opcional)</label>
+          <input id="clientNameInput" type="text" placeholder="Ej. Camila Torres"
+            class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <!-- Approval Decision -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">Estado de la propuesta</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnClientApprove" type="button"
+              class="py-2.5 px-2 rounded-xl border-2 border-slate-200 hover:border-emerald-400 text-xs font-semibold text-slate-700 flex flex-col items-center gap-1 transition">
+              <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
+              <span>Aprobar diseño</span>
+            </button>
+            <button id="btnClientChanges" type="button"
+              class="py-2.5 px-2 rounded-xl border-2 border-slate-200 hover:border-amber-400 text-xs font-semibold text-slate-700 flex flex-col items-center gap-1 transition">
+              <i data-lucide="edit-3" class="w-5 h-5 text-amber-600"></i>
+              <span>Pedir cambios</span>
+            </button>
+          </div>
+          <div id="clientStatusSummary" class="mt-2 text-[11px] font-medium text-slate-500">
+            Estado actual: <span class="font-semibold text-slate-700">Pendiente de revisión</span>
+          </div>
+        </div>
+
+        <!-- Add Comment -->
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <label class="block text-xs font-semibold text-slate-700">Agregar observación</label>
+          <textarea id="clientCommentInput" rows="2" placeholder="Ej. Quiero la foto más grande o mover el QR a la derecha..."
+            class="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs focus:border-indigo-500 focus:outline-none"></textarea>
+          <div class="flex flex-wrap gap-1">
+            <button type="button" data-quick-note="Quiero la imagen más grande" class="quick-note-chip text-[10px] px-2 py-0.5 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200">+ Imagen más grande</button>
+            <button type="button" data-quick-note="Cambiar el QR de posición" class="quick-note-chip text-[10px] px-2 py-0.5 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200">+ Mover QR</button>
+            <button type="button" data-quick-note="Cambiar color del texto" class="quick-note-chip text-[10px] px-2 py-0.5 rounded-full bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200">+ Color de texto</button>
+          </div>
+          <button id="btnAddClientComment" type="button"
+            class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
+            Guardar observación
+          </button>
+        </div>
+
+        <!-- Comments List -->
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Observaciones</h3>
+            <span id="clientCommentsCount" class="text-[11px] text-slate-400">0</span>
+          </div>
+          <div id="clientCommentsList" class="space-y-2 max-h-48 overflow-y-auto custom-scroll">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Export Review Actions -->
+        <div class="pt-3 border-t border-slate-200 space-y-2">
+          <button id="btnExportClientProject" type="button"
+            class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
+            <i data-lucide="file-json" class="w-4 h-4"></i>
+            Descargar proyecto con revisión (.json)
+          </button>
+          <button id="btnExportClientNotesTxt" type="button"
+            class="w-full py-2 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            Descargar solo observaciones (.txt)
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- MODAL: EXPORT HUB -->
+  <div id="exportModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="download" class="w-4 h-4 text-indigo-600"></i>
+          Exportar Proyecto e Imágenes
+        </h3>
+        <button id="btnCloseExportModal" type="button" class="p-1 rounded-lg hover:bg-slate-100 text-slate-500">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-3">
+        <button id="btnDoExportJson" type="button"
+          class="w-full p-3 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/70 text-left flex items-center gap-3 transition">
+          <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+            <i data-lucide="file-json" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-900">Proyecto Completo (.json)</div>
+            <div class="text-[11px] text-slate-600">Incluye imágenes, textos, QR, capas y comentarios. Portable entre equipos.</div>
+          </div>
+        </button>
+
+        <button id="btnDoExportPrintPng" type="button"
+          class="w-full p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-left flex items-center gap-3 transition">
+          <div class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-900">Plantilla Plana para Impresión (PNG Alta Res.)</div>
+            <div class="text-[11px] text-slate-600">Solo el arte limpio listo para sublimar, sin guías ni capa oscura.</div>
+          </div>
+        </button>
+
+        <div class="grid grid-cols-2 gap-2.5 pt-1">
+          <button id="btnDoExportColdPng" type="button"
+            class="p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-left flex flex-col gap-1 transition">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+              <i data-lucide="snowflake" class="w-4 h-4 text-sky-500"></i>
+              Vista Fría (PNG)
+            </div>
+            <span class="text-[11px] text-slate-500">Simulación 3D al 0%</span>
+          </button>
+          <button id="btnDoExportHotPng" type="button"
+            class="p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-left flex flex-col gap-1 transition">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+              <i data-lucide="flame" class="w-4 h-4 text-orange-500"></i>
+              Vista Caliente (PNG)
+            </div>
+            <span class="text-[11px] text-slate-500">Simulación 3D al 100%</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NEW PROJECT / DEMO -->
+  <div id="newProjectModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900">Iniciar Proyecto</h3>
+        <button id="btnCloseNewModal" type="button" class="p-1 rounded-lg hover:bg-slate-100 text-slate-500">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-2.5">
+        <button id="btnStartBlank" type="button"
+          class="w-full p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 text-left transition">
+          <div class="text-xs font-bold text-slate-900">Taza en Blanco</div>
+          <div class="text-[11px] text-slate-500">Empieza desde cero con la plantilla limpia.</div>
+        </button>
+        <button id="btnLoadDemo" type="button"
+          class="w-full p-3 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/60 text-left transition">
+          <div class="text-xs font-bold text-indigo-900">Cargar Proyecto de Demostración</div>
+          <div class="text-[11px] text-indigo-700">Incluye ilustración, texto, elemento visible en frío y QR real.</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DESIGNER VIEW OF CLIENT COMMENTS -->
+  <div id="reviewSummaryModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="message-square" class="w-4 h-4 text-amber-600"></i>
+          Comentarios del Cliente
+        </h3>
+        <button id="btnCloseReviewModal" type="button" class="p-1 rounded-lg hover:bg-slate-100 text-slate-500">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div id="reviewModalBody" class="p-5 space-y-3 max-h-80 overflow-y-auto custom-scroll text-xs"></div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastContainer" class="fixed bottom-16 lg:bottom-5 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // =========================================================================
+    // CONSTANTS & APPLICATION STATE
+    // =========================================================================
+    const STORAGE_KEY = 'magiataza_studio_project_v1';
+    const BASE_CANVAS_W = 1600;
+    const MAX_HISTORY = 35;
+
+    const state = {
+      appMode: 'designer', // 'designer' | 'client'
+      viewMode: '3d',      // '3d' | '2d' | 'split'
+      temperature: 75,     // 0..100
+      isAnimatingThermo: false,
+      thermoAnimDir: 1,
+      autoRotate3D: false,
+      showGuides: true,
+      selectedId: null,
+      project: null,
+      history: [],
+      historyIndex: -1,
+      mobilePanel: 'stage' // 'tools' | 'stage' | 'props'
+    };
+
+    // Runtime caches for loaded HTMLImageElement objects (not serialized)
+    const imageCache = new Map();
+
+    // Offscreen canvases for 2D artwork & 3D thermosensitive composite texture
+    const artCanvas = document.createElement('canvas');
+    const artCtx = artCanvas.getContext('2d');
+    const thermoCanvas = document.createElement('canvas');
+    const thermoCtx = thermoCanvas.getContext('2d');
+
+    // =========================================================================
+    // UTILITIES: IDs, Toast, Contrast, Demo Artwork Generator
+    // =========================================================================
+    function uid(prefix = 'el') {
+      return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    function showToast(msg, type = 'info') {
+      const wrap = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      const colors = {
+        info: 'bg-slate-900 text-white',
+        success: 'bg-emerald-700 text-white',
+        warn: 'bg-amber-600 text-white',
+        error: 'bg-rose-600 text-white'
+      };
+      el.className = `${colors[type] || colors.info} px-3.5 py-2 rounded-xl shadow-lg text-xs font-medium pointer-events-auto transition-opacity duration-300`;
+      el.textContent = msg;
+      wrap.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 2800);
+    }
+
+    function hexToRgb(hex) {
+      const clean = hex.replace('#', '');
+      const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+      const num = parseInt(full, 16);
+      return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+    }
+
+    function luminance({ r, g, b }) {
+      const a = [r, g, b].map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+    }
+
+    function contrastRatio(hex1, hex2) {
+      const l1 = luminance(hexToRgb(hex1));
+      const l2 = luminance(hexToRgb(hex2));
+      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    }
+
+    function getCanvasDims() {
+      const wMm = Number(state.project.mugConfig.widthMm) || 200;
+      const hMm = Number(state.project.mugConfig.heightMm) || 85;
+      const w = BASE_CANVAS_W;
+      const h = Math.round(BASE_CANVAS_W * (hMm / wMm));
+      return { w, h, wMm, hMm };
+    }
+
+    function generateDemoIllustrationDataUrl() {
+      const c = document.createElement('canvas');
+      c.width = 480;
+      c.height = 480;
+      const ctx = c.getContext('2d');
+
+      // Soft warm sunrise circle
+      const grad = ctx.createRadialGradient(240, 210, 20, 240, 240, 210);
+      grad.addColorStop(0, '#fde68a');
+      grad.addColorStop(0.55, '#fb923c');
+      grad.addColorStop(1, '#e11d48');
+      ctx.beginPath();
+      ctx.arc(240, 240, 200, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Stylized mountains
+      ctx.fillStyle = '#312e81';
+      ctx.beginPath();
+      ctx.moveTo(62, 330);
+      ctx.lineTo(175, 195);
+      ctx.lineTo(275, 330);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#4338ca';
+      ctx.beginPath();
+      ctx.moveTo(190, 345);
+      ctx.lineTo(310, 175);
+      ctx.lineTo(422, 345);
+      ctx.closePath();
+      ctx.fill();
+
+      // Snow peaks
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(310, 175);
+      ctx.lineTo(283, 214);
+      ctx.lineTo(304, 206);
+      ctx.lineTo(318, 218);
+      ctx.lineTo(338, 214);
+      ctx.closePath();
+      ctx.fill();
+
+      // Foreground coffee cup silhouette
+      ctx.fillStyle = '#fffbeb';
+      ctx.beginPath();
+      ctx.roundRect(185, 290, 110, 82, [6, 6, 28, 28]);
+      ctx.fill();
+      ctx.strokeStyle = '#fffbeb';
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.arc(298, 326, 22, -Math.PI / 2, Math.PI / 2);
+      ctx.stroke();
+
+      // Steam swirls
+      ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      [215, 240, 265].forEach((x, idx) => {
+        ctx.beginPath();
+        ctx.moveTo(x, 276);
+        ctx.bezierCurveTo(x - 10, 260, x + 10, 246, x, 232 - idx * 4);
+        ctx.stroke();
+      });
+
+      // Decorative ring
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(240, 240, 200, 0, Math.PI * 2);
+      ctx.stroke();
+
+      return c.toDataURL('image/png');
+    }
+
+    function createStickerDataUrl(emoji, bg) {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.arc(128, 128, 112, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 10;
+      ctx.stroke();
+      ctx.font = '120px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, 128, 136);
+      return c.toDataURL('image/png');
+    }
+
+    // =========================================================================
+    // DEFAULT & DEMO PROJECTS
+    // =========================================================================
+    function createBlankProject() {
+      return {
+        version: 1,
+        projectName: 'Nueva Taza Personalizada',
+        updatedAt: new Date().toISOString(),
+        mugConfig: {
+          widthMm: 200,
+          heightMm: 85,
+          bgColor: '#ffffff',
+          interiorColor: '#ffffff',
+          coldCoatColor: '#141419'
+        },
+        elements: [],
+        clientReview: {
+          status: 'pendiente',
+          clientName: '',
+          comments: []
+        }
+      };
+    }
+
+    function createDemoProject() {
+      const demoImg = generateDemoIllustrationDataUrl();
+      return {
+        version: 1,
+        projectName: 'Taza Mágica — Demo Regalo',
+        updatedAt: new Date().toISOString(),
+        mugConfig: {
+          widthMm: 200,
+          heightMm: 85,
+          bgColor: '#fffbf5',
+          interiorColor: '#ffffff',
+          coldCoatColor: '#141419'
+        },
+        elements: [
+          {
+            id: uid('img'),
+            type: 'image',
+            name: 'Ilustración Amanecer',
+            src: demoImg,
+            x: 0.27,
+            y: 0.50,
+            w: 0.25,
+            h: 0.58,
+            aspect: 1,
+            rotation: -4,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            visibleInCold: false
+          },
+          {
+            id: uid('txt'),
+            type: 'text',
+            name: 'Título Principal',
+            text: '¡Buenos Días!',
+            fontFamily: 'Pacifico',
+            fontSize: 82,
+            color: '#be123c',
+            bold: false,
+            italic: false,
+            x: 0.54,
+            y: 0.39,
+            scale: 1,
+            rotation: -2,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            visibleInCold: false
+          },
+          {
+            id: uid('txt'),
+            type: 'text',
+            name: 'Subtítulo',
+            text: 'EL CALOR REVELA TU MENSAJE',
+            fontFamily: 'Montserrat',
+            fontSize: 30,
+            color: '#1e293b',
+            bold: true,
+            italic: false,
+            x: 0.54,
+            y: 0.61,
+            scale: 1,
+            rotation: 0,
+            opacity: 0.92,
+            visible: true,
+            locked: false,
+            visibleInCold: false
+          },
+          {
+            id: uid('shp'),
+            type: 'shape',
+            name: 'Corazón (Visible en frío)',
+            shape: 'heart',
+            fill: '#f43f5e',
+            stroke: '#ffffff',
+            strokeWidth: 8,
+            x: 0.54,
+            y: 0.80,
+            w: 0.065,
+            h: 0.15,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            visibleInCold: true
+          },
+          {
+            id: uid('qr'),
+            type: 'qr',
+            name: 'Código QR Sorpresa',
+            qrData: 'https://wa.me/51999888777?text=Me%20encanto%20esta%20taza%20magica',
+            fgColor: '#0f172a',
+            bgColor: '#ffffff',
+            x: 0.81,
+            y: 0.50,
+            w: 0.17,
+            h: 0.40,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            locked: false,
+            visibleInCold: false
+          }
+        ],
+        clientReview: {
+          status: 'pendiente',
+          clientName: '',
+          comments: []
+        }
+      };
+    }
+
+    // =========================================================================
+    // HISTORY & AUTOSAVE
+    // =========================================================================
+    function cloneProject(proj) {
+      return JSON.parse(JSON.stringify(proj));
+    }
+
+    function pushHistory() {
+      const snap = cloneProject(state.project);
+      if (state.historyIndex < state.history.length - 1) {
+        state.history = state.history.slice(0, state.historyIndex + 1);
+      }
+      state.history.push(snap);
+      if (state.history.length > MAX_HISTORY) {
+        state.history.shift();
+      }
+      state.historyIndex = state.history.length - 1;
+      updateHistoryButtons();
+      scheduleAutoSave();
+    }
+
+    function updateHistoryButtons() {
+      const canUndo = state.historyIndex > 0;
+      const canRedo = state.historyIndex < state.history.length - 1;
+      ['btnUndo', 'mBtnUndo'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = !canUndo;
+      });
+      ['btnRedo', 'mBtnRedo'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = !canRedo;
+      });
+    }
+
+    function undo() {
+      if (state.historyIndex <= 0) return;
+      state.historyIndex--;
+      state.project = cloneProject(state.history[state.historyIndex]);
+      if (state.selectedId && !state.project.elements.some(e => e.id === state.selectedId)) {
+        state.selectedId = null;
+      }
+      preloadProjectImages(() => {
+        syncAllUI();
+        renderAll();
+      });
+      updateHistoryButtons();
+      scheduleAutoSave();
+      showToast('Cambio deshecho');
+    }
+
+    function redo() {
+      if (state.historyIndex >= state.history.length - 1) return;
+      state.historyIndex++;
+      state.project = cloneProject(state.history[state.historyIndex]);
+      preloadProjectImages(() => {
+        syncAllUI();
+        renderAll();
+      });
+      updateHistoryButtons();
+      scheduleAutoSave();
+      showToast('Cambio rehecho');
+    }
+
+    let autoSaveTimer = null;
+    function scheduleAutoSave() {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        const badge = document.getElementById('autosaveBadge');
+        try {
+          state.project.updatedAt = new Date().toISOString();
+          const serialized = JSON.stringify(state.project);
+          if (serialized.length > 4_200_000) {
+            if (badge) {
+              badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Exporta .json';
+              badge.className = 'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
+            }
+            return;
+          }
+          localStorage.setItem(STORAGE_KEY, serialized);
+          if (badge) {
+            badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Guardado';
+            badge.className = 'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
+          }
+        } catch (err) {
+          if (badge) {
+            badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Solo sesión';
+          }
+        }
+      }, 450);
+    }
+
+    function loadSavedProject() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.mugConfig && Array.isArray(parsed.elements)) {
+            return parsed;
+          }
+        }
+      } catch (e) { /* ignore storage errors */ }
+      return null;
+    }
+
+    // =========================================================================
+    // QR CODE RENDERING (REAL SCANNABLE QR MATRIX)
+    // =========================================================================
+    // Built-in ISO/IEC 18004 QR Code Encoder (Byte Mode, ECC Level M, Versions 1-10)
+    // Guarantees real scannable QR codes even completely offline without CDN!
+    const MiniQR = (() => {
+      const EXP = new Uint8Array(512);
+      const LOG = new Uint8Array(256);
+      let x = 1;
+      for (let i = 0; i < 255; i++) {
+        EXP[i] = x;
+        LOG[x] = i;
+        x <<= 1;
+        if (x & 256) x ^= 0x11d;
+      }
+      for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+
+      function gfMul(a, b) {
+        return (a === 0 || b === 0) ? 0 : EXP[LOG[a] + LOG[b]];
+      }
+
+      function rsGenPoly(deg) {
+        let poly = [1];
+        for (let i = 0; i < deg; i++) {
+          const next = new Array(poly.length + 1).fill(0);
+          for (let j = 0; j < poly.length; j++) {
+            next[j] ^= poly[j];
+            next[j + 1] ^= gfMul(poly[j], EXP[i]);
+          }
+          poly = next;
+        }
+        return poly;
+      }
+
+      function rsEncode(data, ecLen) {
+        const gen = rsGenPoly(ecLen);
+        const rem = new Uint8Array(ecLen);
+        for (let i = 0; i < data.length; i++) {
+          const factor = data[i] ^ rem[0];
+          for (let j = 0; j < ecLen - 1; j++) rem[j] = rem[j + 1];
+          rem[ecLen - 1] = 0;
+          for (let j = 0; j < ecLen; j++) rem[j] ^= gfMul(gen[j + 1], factor);
+        }
+        return Array.from(rem);
+      }
+
+      // Version 1..10 table for ECC Level M: [totalCodewords, ecPerBlock, numBlocks, alignPositions]
+      const VERSIONS = [
+        null,
+        [26, 10, 1, []],
+        [44, 16, 1, [6, 18]],
+        [70, 26, 1, [6, 22]],
+        [100, 18, 2, [6, 26]],
+        [134, 24, 2, [6, 30]],
+        [172, 16, 4, [6, 34]],
+        [196, 18, 4, [6, 22, 38]],
+        [242, 22, 4, [6, 24, 42]],
+        [292, 22, 5, [6, 26, 46]],
+        [346, 26, 5, [6, 28, 50]]
+      ];
+
+      function encode(text) {
+        const bytes = Array.from(new TextEncoder().encode(text));
+        let ver = 1;
+        for (; ver <= 10; ver++) {
+          const [totalCw, ecPer, blocks] = VERSIONS[ver];
+          const dataCap = totalCw - ecPer * blocks;
+          const headerBytes = ver >= 10 ? 3 : 2;
+          if (bytes.length + headerBytes <= dataCap) break;
+        }
+        if (ver > 10) {
+          ver = 10;
+          bytes.length = 210;
+        }
+
+        const [totalCw, ecPer, blocks, aligns] = VERSIONS[ver];
+        const dataCap = totalCw - ecPer * blocks;
+
+        // Bit buffer: Mode 0100 (Byte), length, payload, terminator, pad
+        const bits = [];
+        const pushBits = (val, len) => {
+          for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1);
+        };
+        pushBits(0b0100, 4);
+        pushBits(bytes.length, ver >= 10 ? 16 : 8);
+        bytes.forEach(b => pushBits(b, 8));
+        const maxBits = dataCap * 8;
+        for (let i = 0; i < 4 && bits.length < maxBits; i++) bits.push(0);
+        while (bits.length % 8 !== 0) bits.push(0);
+        const padBytes = [0xec, 0x11];
+        let pIdx = 0;
+        while (bits.length < maxBits) {
+          pushBits(padBytes[pIdx++ % 2], 8);
+        }
+
+        const dataCw = [];
+        for (let i = 0; i < bits.length; i += 8) {
+          let b = 0;
+          for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j];
+          dataCw.push(b);
+        }
+
+        // Split into RS blocks & interleave
+        const shortBlocks = blocks - (dataCap % blocks);
+        const shortLen = Math.floor(dataCap / blocks);
+        const dBlocks = [];
+        const eBlocks = [];
+        let offset = 0;
+        for (let b = 0; b < blocks; b++) {
+          const len = b < shortBlocks ? shortLen : shortLen + 1;
+          const slice = dataCw.slice(offset, offset + len);
+          offset += len;
+          dBlocks.push(slice);
+          eBlocks.push(rsEncode(slice, ecPer));
+        }
+
+        const finalCw = [];
+        const maxDLen = shortLen + (dataCap % blocks ? 1 : 0);
+        for (let i = 0; i < maxDLen; i++) {
+          for (let b = 0; b < blocks; b++) {
+            if (i < dBlocks[b].length) finalCw.push(dBlocks[b][i]);
+          }
+        }
+        for (let i = 0; i < ecPer; i++) {
+          for (let b = 0; b < blocks; b++) finalCw.push(eBlocks[b][i]);
+        }
+
+        const size = ver * 4 + 17;
+        const grid = Array.from({ length: size }, () => new Int8Array(size).fill(-1));
+        const isFunc = Array.from({ length: size }, () => new Uint8Array(size));
+
+        const setMod = (r, c, dark, func = true) => {
+          if (r < 0 || r >= size || c < 0 || c >= size) return;
+          grid[r][c] = dark ? 1 : 0;
+          if (func) isFunc[r][c] = 1;
+        };
+
+        // Finder patterns + separators
+        [[0, 0], [0, size - 7], [size - 7, 0]].forEach(([fr, fc]) => {
+          for (let dr = -1; dr <= 7; dr++) {
+            for (let dc = -1; dc <= 7; dc++) {
+              const r = fr + dr, c = fc + dc;
+              if (r < 0 || r >= size || c < 0 || c >= size) continue;
+              const in7 = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
+              const dark = in7 && (dr === 0 || dr === 6 || dc === 0 || dc === 6 || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4));
+              setMod(r, c, dark, true);
+            }
+          }
+        });
+
+        // Timing patterns
+        for (let i = 8; i < size - 8; i++) {
+          setMod(6, i, i % 2 === 0, true);
+          setMod(i, 6, i % 2 === 0, true);
+        }
+
+        // Alignment patterns
+        for (const ar of aligns) {
+          for (const ac of aligns) {
+            if (isFunc[ar][ac]) continue;
+            for (let dr = -2; dr <= 2; dr++) {
+              for (let dc = -2; dc <= 2; dc++) {
+                const dark = Math.max(Math.abs(dr), Math.abs(dc)) !== 1;
+                setMod(ar + dr, ac + dc, dark, true);
+              }
+            }
+          }
+        }
+
+        // Reserve format info & dark module
+        for (let i = 0; i < 9; i++) {
+          if (i !== 6) {
+            setMod(8, i, false, true);
+            setMod(i, 8, false, true);
+          }
+        }
+        for (let i = 0; i < 8; i++) {
+          setMod(8, size - 1 - i, false, true);
+          setMod(size - 1 - i, 8, false, true);
+        }
+        setMod(size - 8, 8, true, true);
+
+        // Version info for ver >= 7
+        if (ver >= 7) {
+          let rem = ver;
+          for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1f25);
+          const vBits = (ver << 12) | rem;
+          for (let i = 0; i < 18; i++) {
+            const bit = ((vBits >>> i) & 1) === 1;
+            const a = size - 11 + (i % 3);
+            const b = Math.floor(i / 3);
+            setMod(b, a, bit, true);
+            setMod(a, b, bit, true);
+          }
+        }
+
+        // Place data bits (zigzag) with Mask 0 ((r + c) % 2 === 0)
+        const allBits = [];
+        finalCw.forEach(cw => {
+          for (let i = 7; i >= 0; i--) allBits.push((cw >>> i) & 1);
+        });
+        let bPtr = 0;
+        let up = true;
+        for (let right = size - 1; right >= 1; right -= 2) {
+          if (right === 6) right = 5;
+          for (let vert = 0; vert < size; vert++) {
+            const r = up ? size - 1 - vert : vert;
+            for (let j = 0; j < 2; j++) {
+              const c = right - j;
+              if (!isFunc[r][c]) {
+                const rawBit = bPtr < allBits.length ? allBits[bPtr++] : 0;
+                const masked = rawBit ^ (((r + c) % 2 === 0) ? 1 : 0);
+                grid[r][c] = masked;
+              }
+            }
+          }
+          up = !up;
+        }
+
+        // Write Format Info for ECC M (00) + Mask 0 (000) -> 0b00000 -> BCH + XOR 0x5412 = 0x5412
+        const fmt = 0x5412;
+        for (let i = 0; i <= 5; i++) setMod(8, i, ((fmt >>> i) & 1) === 1, true);
+        setMod(8, 7, ((fmt >>> 6) & 1) === 1, true);
+        setMod(8, 8, ((fmt >>> 7) & 1) === 1, true);
+        setMod(7, 8, ((fmt >>> 8) & 1) === 1, true);
+        for (let i = 9; i < 15; i++) setMod(14 - i, 8, ((fmt >>> i) & 1) === 1, true);
+        for (let i = 0; i < 8; i++) setMod(size - 1 - i, 8, ((fmt >>> i) & 1) === 1, true);
+        for (let i = 8; i < 15; i++) setMod(8, size - 15 + i, ((fmt >>> i) & 1) === 1, true);
+
+        return {
+          getModuleCount: () => size,
+          isDark: (r, c) => grid[r][c] === 1
+        };
+      }
+
+      return { encode };
+    })();
+
+    function buildQrMatrix(text) {
+      const content = (text || 'https://magiataza.studio').trim() || 'MagiaTaza';
+      if (typeof window.qrcode === 'function') {
+        try {
+          const qr = window.qrcode(0, 'M');
+          qr.addData(content);
+          qr.make();
+          return qr;
+        } catch (e) { /* fallback to built-in encoder */ }
+      }
+      return MiniQR.encode(content);
+    }
+
+    function drawQrToCanvas(ctx, x, y, w, h, text, fgColor, bgColor) {
+      const qr = buildQrMatrix(text);
+      const size = Math.min(w, h);
+      const ox = x - size / 2;
+      const oy = y - size / 2;
+
+      ctx.save();
+      ctx.fillStyle = bgColor || '#ffffff';
+      ctx.fillRect(ox, oy, size, size);
+
+      if (!qr) {
+        ctx.fillStyle = fgColor || '#000000';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('QR', x, y);
+        ctx.restore();
+        return;
+      }
+
+      const count = qr.getModuleCount();
+      const quiet = 2; // quiet zone in modules
+      const totalModules = count + quiet * 2;
+      const cell = size / totalModules;
+
+      ctx.fillStyle = fgColor || '#0f172a';
+      for (let r = 0; r < count; r++) {
+        for (let c = 0; c < count; c++) {
+          if (qr.isDark(r, c)) {
+            ctx.fillRect(
+              ox + (c + quiet) * cell,
+              oy + (r + quiet) * cell,
+              Math.ceil(cell),
+              Math.ceil(cell)
+            );
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    function getCurrentQrInputData() {
+      const type = document.getElementById('qrTypeSelect').value;
+      if (type === 'whatsapp') {
+        const phone = document.getElementById('qrWaPhone').value.replace(/[^\d]/g, '');
+        const msg = document.getElementById('qrWaMsg').value.trim();
+        return `https://wa.me/${phone || '51999888777'}${msg ? '?text=' + encodeURIComponent(msg) : ''}`;
+      }
+      let val = document.getElementById('qrContentInput').value.trim();
+      if (type === 'social' && val.startsWith('@')) {
+        val = `https://instagram.com/${val.slice(1)}`;
+      }
+      return val || 'https://magiataza.studio';
+    }
+
+    function updateQrPanelPreview() {
+      const canvas = document.getElementById('qrPreviewCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const data = getCurrentQrInputData();
+      const fg = document.getElementById('qrFgColor').value;
+      const bg = document.getElementById('qrBgColor').value;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawQrToCanvas(ctx, canvas.width / 2, canvas.height / 2, canvas.width, canvas.height, data, fg, bg);
+
+      const ratio = contrastRatio(fg, bg);
+      const statusEl = document.getElementById('qrContrastStatus');
+      if (ratio >= 4.5) {
+        statusEl.textContent = `Contraste: ${ratio.toFixed(1)}:1 — Óptimo para escaneo`;
+        statusEl.className = 'text-[11px] font-medium text-emerald-700 text-center';
+      } else {
+        statusEl.textContent = `Contraste bajo (${ratio.toFixed(1)}:1) — Usa colores más opuestos`;
+        statusEl.className = 'text-[11px] font-semibold text-amber-700 text-center';
+      }
+    }
+
+    // =========================================================================
+    // DRAWING ELEMENTS (SHARED BY 2D EDITOR, 3D TEXTURE & HIGH-RES PRINT EXPORT)
+    // =========================================================================
+    function preloadProjectImages(onDone) {
+      const imgs = state.project.elements.filter(el => el.type === 'image' && el.src);
+      let pending = 0;
+      imgs.forEach(el => {
+        if (imageCache.has(el.src)) return;
+        pending++;
+        const img = new Image();
+        img.onload = () => {
+          imageCache.set(el.src, img);
+          pending--;
+          if (pending === 0 && onDone) onDone();
+        };
+        img.onerror = () => {
+          pending--;
+          if (pending === 0 && onDone) onDone();
+        };
+        img.src = el.src;
+      });
+      if (pending === 0 && onDone) onDone();
+    }
+
+    function drawShapePath(ctx, shape, w, h) {
+      const hw = w / 2;
+      const hh = h / 2;
+      ctx.beginPath();
+      if (shape === 'circle') {
+        ctx.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2);
+      } else if (shape === 'roundedRect') {
+        const r = Math.min(hw, hh) * 0.35;
+        ctx.roundRect(-hw, -hh, w, h, r);
+      } else if (shape === 'heart') {
+        ctx.moveTo(0, hh * 0.85);
+        ctx.bezierCurveTo(-hw * 1.15, hh * 0.15, -hw * 1.05, -hh * 0.95, 0, -hh * 0.3);
+        ctx.bezierCurveTo(hw * 1.05, -hh * 0.95, hw * 1.15, hh * 0.15, 0, hh * 0.85);
+      } else if (shape === 'star') {
+        const spikes = 5;
+        for (let i = 0; i < spikes * 2; i++) {
+          const rad = i % 2 === 0 ? Math.min(hw, hh) : Math.min(hw, hh) * 0.44;
+          const ang = (i * Math.PI) / spikes - Math.PI / 2;
+          const px = Math.cos(ang) * rad;
+          const py = Math.sin(ang) * rad;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      } else if (shape === 'ribbon') {
+        ctx.moveTo(-hw, -hh * 0.65);
+        ctx.lineTo(hw, -hh * 0.65);
+        ctx.lineTo(hw * 0.82, 0);
+        ctx.lineTo(hw, hh * 0.65);
+        ctx.lineTo(-hw, hh * 0.65);
+        ctx.lineTo(-hw * 0.82, 0);
+        ctx.closePath();
+      } else if (shape === 'sparkle') {
+        const rOut = Math.min(hw, hh);
+        const rIn = rOut * 0.24;
+        for (let i = 0; i < 8; i++) {
+          const r = i % 2 === 0 ? rOut : rIn;
+          const a = (i * Math.PI) / 4;
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      } else {
+        ctx.rect(-hw, -hh, w, h);
+      }
+    }
+
+    function measureElementBox(ctx, el, cw, ch) {
+      if (el.type === 'text') {
+        const scale = el.scale || 1;
+        const pxSize = Math.max(12, (el.fontSize || 48) * (cw / BASE_CANVAS_W) * scale);
+        ctx.save();
+        ctx.font = `${el.italic ? 'italic ' : ''}${el.bold ? '700 ' : '400 '}${pxSize}px "${el.fontFamily || 'Montserrat'}", sans-serif`;
+        const lines = (el.text || 'Texto').split('\n');
+        let maxW = 40;
+        lines.forEach(line => {
+          const m = ctx.measureText(line);
+          if (m.width > maxW) maxW = m.width;
+        });
+        ctx.restore();
+        const lineH = pxSize * 1.22;
+        return { w: maxW + pxSize * 0.35, h: lines.length * lineH + pxSize * 0.2, pxSize, lineH };
+      }
+      return {
+        w: (el.w || 0.2) * cw,
+        h: (el.h || 0.2) * ch
+      };
+    }
+
+    function drawSingleElement(ctx, el, cw, ch) {
+      if (!el.visible) return;
+      const cx = el.x * cw;
+      const cy = el.y * ch;
+      const box = measureElementBox(ctx, el, cw, ch);
+
+      ctx.save();
+      ctx.globalAlpha = el.opacity ?? 1;
+      ctx.translate(cx, cy);
+      ctx.rotate(((el.rotation || 0) * Math.PI) / 180);
+
+      if (el.type === 'image') {
+        const img = imageCache.get(el.src);
+        if (img) {
+          ctx.drawImage(img, -box.w / 2, -box.h / 2, box.w, box.h);
+        } else {
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
+        }
+      } else if (el.type === 'text') {
+        ctx.font = `${el.italic ? 'italic ' : ''}${el.bold ? '700 ' : '400 '}${box.pxSize}px "${el.fontFamily || 'Montserrat'}", sans-serif`;
+        ctx.fillStyle = el.color || '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const lines = (el.text || '').split('\n');
+        const totalH = lines.length * box.lineH;
+        lines.forEach((line, idx) => {
+          const ly = -totalH / 2 + box.lineH * (idx + 0.5);
+          ctx.fillText(line, 0, ly);
+        });
+      } else if (el.type === 'shape') {
+        drawShapePath(ctx, el.shape, box.w, box.h);
+        ctx.fillStyle = el.fill || '#f43f5e';
+        ctx.fill();
+        if (el.stroke && (el.strokeWidth ?? 4) > 0) {
+          ctx.strokeStyle = el.stroke;
+          ctx.lineWidth = (el.strokeWidth ?? 4) * (cw / BASE_CANVAS_W);
+          ctx.stroke();
+        }
+      } else if (el.type === 'qr') {
+        drawQrToCanvas(ctx, 0, 0, box.w, box.h, el.qrData, el.fgColor, el.bgColor);
+      }
+
+      ctx.restore();
+    }
+
+    function renderArtworkToCanvas(targetCanvas, targetCtx, cw, ch, onlyColdVisible = false) {
+      targetCanvas.width = cw;
+      targetCanvas.height = ch;
+
+      if (!onlyColdVisible) {
+        targetCtx.fillStyle = state.project.mugConfig.bgColor || '#ffffff';
+        targetCtx.fillRect(0, 0, cw, ch);
+      } else {
+        targetCtx.clearRect(0, 0, cw, ch);
+      }
+
+      state.project.elements.forEach(el => {
+        if (onlyColdVisible && !el.visibleInCold) return;
+        drawSingleElement(targetCtx, el, cw, ch);
+      });
+    }
+
+    // Build full cylinder wrap texture with thermosensitive coating & handle gap
+    function buildMugTextureCanvas() {
+      const { w, h } = getCanvasDims();
+      // Full cylinder texture: printable wrap occupies ~82% centered, 9% margin each side near handle
+      const texW = 2048;
+      const texH = 1024;
+      thermoCanvas.width = texW;
+      thermoCanvas.height = texH;
+
+      // Ceramic base under entire exterior
+      thermoCtx.fillStyle = state.project.mugConfig.bgColor || '#ffffff';
+      thermoCtx.fillRect(0, 0, texW, texH);
+
+      // Compute printable rectangle inside cylinder texture
+      const wrapFracW = 0.82;
+      const wrapFracH = Math.min(0.88, Math.max(0.55, (state.project.mugConfig.heightMm || 85) / 102));
+      const pw = Math.round(texW * wrapFracW);
+      const ph = Math.round(texH * wrapFracH);
+      const px = Math.round((texW - pw) / 2);
+      const py = Math.round((texH - ph) / 2);
+
+      // 1. Render full printed artwork
+      renderArtworkToCanvas(artCanvas, artCtx, w, h, false);
+      thermoCtx.drawImage(artCanvas, px, py, pw, ph);
+
+      // 2. Apply thermosensitive dark layer based on temperature (0 = cold/opaque, 100 = hot/transparent)
+      const temp = state.temperature / 100; // 0..1
+      const coatColor = state.project.mugConfig.coldCoatColor || '#141419';
+      const rgb = hexToRgb(coatColor);
+
+      if (temp < 0.995) {
+        // Organic bottom-up heat reveal gradient (hot liquid warms lower/middle mug first)
+        const baseAlpha = Math.pow(1 - temp, 1.15);
+        const topAlpha = Math.min(1, baseAlpha * 1.28);
+        const midAlpha = Math.min(1, baseAlpha * 0.96);
+        const botAlpha = Math.max(0, baseAlpha * 0.72 - (temp > 0.45 ? (temp - 0.45) * 0.55 : 0));
+
+        const grad = thermoCtx.createLinearGradient(0, 0, 0, texH);
+        grad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},${topAlpha.toFixed(3)})`);
+        grad.addColorStop(0.55, `rgba(${rgb.r},${rgb.g},${rgb.b},${midAlpha.toFixed(3)})`);
+        grad.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},${botAlpha.toFixed(3)})`);
+
+        thermoCtx.fillStyle = grad;
+        thermoCtx.fillRect(0, 0, texW, texH);
+
+        // 3. Redraw elements marked "visibleInCold" on top so they remain visible when cold
+        const hasColdVisible = state.project.elements.some(e => e.visible && e.visibleInCold);
+        if (hasColdVisible) {
+          const coldLayer = document.createElement('canvas');
+          const coldCtx = coldLayer.getContext('2d');
+          renderArtworkToCanvas(coldLayer, coldCtx, w, h, true);
+          thermoCtx.drawImage(coldLayer, px, py, pw, ph);
+        }
+      }
+
+      return thermoCanvas;
+    }
+
+    // =========================================================================
+    // 2D INTERACTIVE FLAT TEMPLATE EDITOR
+    // =========================================================================
+    const editor2DCanvas = document.getElementById('editor2DCanvas');
+    const editor2DCtx = editor2DCanvas.getContext('2d');
+
+    let dragState = null; // { mode: 'move'|'resize'|'rotate', elId, startX, startY, orig... }
+
+    function get2DDisplaySize() {
+      const { wMm, hMm } = getCanvasDims();
+      const dispW = 860;
+      const dispH = Math.round(dispW * (hMm / wMm));
+      return { dispW, dispH };
+    }
+
+    function render2DEditor() {
+      const { dispW, dispH } = get2DDisplaySize();
+      editor2DCanvas.width = dispW;
+      editor2DCanvas.height = dispH;
+
+      // Draw clean printed artwork
+      renderArtworkToCanvas(artCanvas, artCtx, dispW, dispH, false);
+      editor2DCtx.clearRect(0, 0, dispW, dispH);
+      editor2DCtx.drawImage(artCanvas, 0, 0);
+
+      // Printable safe guides
+      if (state.showGuides) {
+        editor2DCtx.save();
+        editor2DCtx.strokeStyle = 'rgba(79, 70, 229, 0.55)';
+        editor2DCtx.lineWidth = 1.5;
+        editor2DCtx.setLineDash([7, 5]);
+        editor2DCtx.strokeRect(8, 8, dispW - 16, dispH - 16);
+
+        // Center front line
+        editor2DCtx.strokeStyle = 'rgba(79, 70, 229, 0.28)';
+        editor2DCtx.beginPath();
+        editor2DCtx.moveTo(dispW / 2, 0);
+        editor2DCtx.lineTo(dispW / 2, dispH);
+        editor2DCtx.stroke();
+        editor2DCtx.restore();
+      }
+
+      // Draw selection handles in Designer Mode
+      if (state.appMode === 'designer' && state.selectedId) {
+        const el = state.project.elements.find(e => e.id === state.selectedId);
+        if (el && el.visible) {
+          const box = measureElementBox(editor2DCtx, el, dispW, dispH);
+          const cx = el.x * dispW;
+          const cy = el.y * dispH;
+
+          editor2DCtx.save();
+          editor2DCtx.translate(cx, cy);
+          editor2DCtx.rotate(((el.rotation || 0) * Math.PI) / 180);
+
+          // Selection outline
+          editor2DCtx.strokeStyle = '#4f46e5';
+          editor2DCtx.lineWidth = 2;
+          editor2DCtx.strokeRect(-box.w / 2, -box.h / 2, box.w, box.h);
+
+          // Corner resize handles
+          const corners = [
+            [-box.w / 2, -box.h / 2],
+            [box.w / 2, -box.h / 2],
+            [box.w / 2, box.h / 2],
+            [-box.w / 2, box.h / 2]
+          ];
+          editor2DCtx.fillStyle = '#ffffff';
+          editor2DCtx.strokeStyle = '#4f46e5';
+          editor2DCtx.lineWidth = 2;
+          corners.forEach(([hx, hy]) => {
+            editor2DCtx.beginPath();
+            editor2DCtx.arc(hx, hy, 6, 0, Math.PI * 2);
+            editor2DCtx.fill();
+            editor2DCtx.stroke();
+          });
+
+          // Rotation handle on top
+          editor2DCtx.beginPath();
+          editor2DCtx.moveTo(0, -box.h / 2);
+          editor2DCtx.lineTo(0, -box.h / 2 - 22);
+          editor2DCtx.stroke();
+          editor2DCtx.beginPath();
+          editor2DCtx.arc(0, -box.h / 2 - 22, 6.5, 0, Math.PI * 2);
+          editor2DCtx.fillStyle = '#f97316';
+          editor2DCtx.fill();
+          editor2DCtx.strokeStyle = '#ffffff';
+          editor2DCtx.stroke();
+
+          editor2DCtx.restore();
+        }
+      }
+    }
+
+    function getCanvasPointerPos(evt) {
+      const rect = editor2DCanvas.getBoundingClientRect();
+      const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+      return {
+        x: ((clientX - rect.left) / rect.width) * editor2DCanvas.width,
+        y: ((clientY - rect.top) / rect.height) * editor2DCanvas.height
+      };
+    }
+
+    function toElementLocal(el, px, py, cw, ch) {
+      const dx = px - el.x * cw;
+      const dy = py - el.y * ch;
+      const rad = -((el.rotation || 0) * Math.PI) / 180;
+      return {
+        lx: dx * Math.cos(rad) - dy * Math.sin(rad),
+        ly: dx * Math.sin(rad) + dy * Math.cos(rad)
+      };
+    }
+
+    function clampElementInsidePrintable(el) {
+      el.x = Math.min(0.95, Math.max(0.05, el.x));
+      el.y = Math.min(0.94, Math.max(0.06, el.y));
+    }
+
+    function handle2DPointerDown(evt) {
+      if (state.appMode !== 'designer') return;
+      const pos = getCanvasPointerPos(evt);
+      const cw = editor2DCanvas.width;
+      const ch = editor2DCanvas.height;
+
+      // Check selected element handles first
+      if (state.selectedId) {
+        const sel = state.project.elements.find(e => e.id === state.selectedId);
+        if (sel && sel.visible && !sel.locked) {
+          const box = measureElementBox(editor2DCtx, sel, cw, ch);
+          const { lx, ly } = toElementLocal(sel, pos.x, pos.y, cw, ch);
+
+          // Rotate handle
+          if (Math.hypot(lx, ly - (-box.h / 2 - 22)) <= 13) {
+            evt.preventDefault();
+            dragState = {
+              mode: 'rotate',
+              elId: sel.id,
+              cx: sel.x * cw,
+              cy: sel.y * ch
+            };
+            return;
+          }
+
+          // Corner resize handles
+          const corners = [
+            [-box.w / 2, -box.h / 2],
+            [box.w / 2, -box.h / 2],
+            [box.w / 2, box.h / 2],
+            [-box.w / 2, box.h / 2]
+          ];
+          for (const [hx, hy] of corners) {
+            if (Math.hypot(lx - hx, ly - hy) <= 13) {
+              evt.preventDefault();
+              dragState = {
+                mode: 'resize',
+                elId: sel.id,
+                startDist: Math.max(12, Math.hypot(pos.x - sel.x * cw, pos.y - sel.y * ch)),
+                origW: sel.w || 0.2,
+                origH: sel.h || 0.2,
+                origScale: sel.scale || 1
+              };
+              return;
+            }
+          }
+        }
+      }
+
+      // Hit test elements top-to-bottom
+      let hit = null;
+      for (let i = state.project.elements.length - 1; i >= 0; i--) {
+        const el = state.project.elements[i];
+        if (!el.visible) continue;
+        const box = measureElementBox(editor2DCtx, el, cw, ch);
+        const { lx, ly } = toElementLocal(el, pos.x, pos.y, cw, ch);
+        if (Math.abs(lx) <= box.w / 2 + 6 && Math.abs(ly) <= box.h / 2 + 6) {
+          hit = el;
+          break;
+        }
+      }
+
+      if (hit) {
+        state.selectedId = hit.id;
+        syncPropertiesPanel();
+        renderLayersList();
+        render2DEditor();
+        if (!hit.locked) {
+          evt.preventDefault();
+          dragState = {
+            mode: 'move',
+            elId: hit.id,
+            startX: pos.x,
+            startY: pos.y,
+            origX: hit.x,
+            origY: hit.y
+          };
+        }
+      } else {
+        state.selectedId = null;
+        syncPropertiesPanel();
+        renderLayersList();
+        render2DEditor();
+      }
+    }
+
+    function handle2DPointerMove(evt) {
+      if (!dragState) return;
+      evt.preventDefault();
+      const pos = getCanvasPointerPos(evt);
+      const cw = editor2DCanvas.width;
+      const ch = editor2DCanvas.height;
+      const el = state.project.elements.find(e => e.id === dragState.elId);
+      if (!el) return;
+
+      if (dragState.mode === 'move') {
+        el.x = dragState.origX + (pos.x - dragState.startX) / cw;
+        el.y = dragState.origY + (pos.y - dragState.startY) / ch;
+        clampElementInsidePrintable(el);
+      } else if (dragState.mode === 'rotate') {
+        const ang = Math.atan2(pos.y - dragState.cy, pos.x - dragState.cx) * (180 / Math.PI) + 90;
+        el.rotation = Math.round(((ang + 180) % 360) - 180);
+      } else if (dragState.mode === 'resize') {
+        const dist = Math.max(12, Math.hypot(pos.x - el.x * cw, pos.y - el.y * ch));
+        const factor = Math.min(3.5, Math.max(0.2, dist / dragState.startDist));
+        if (el.type === 'text') {
+          el.scale = Math.min(2.6, Math.max(0.25, +(dragState.origScale * factor).toFixed(2)));
+        } else {
+          el.w = Math.min(0.95, Math.max(0.04, dragState.origW * factor));
+          el.h = Math.min(0.95, Math.max(0.06, dragState.origH * factor));
+        }
+      }
+
+      syncPropertiesPanel();
+      renderAll();
+    }
+
+    function handle2DPointerUp() {
+      if (dragState) {
+        dragState = null;
+        pushHistory();
+      }
+    }
+
+    editor2DCanvas.addEventListener('mousedown', handle2DPointerDown);
+    window.addEventListener('mousemove', handle2DPointerMove);
+    window.addEventListener('mouseup', handle2DPointerUp);
+    editor2DCanvas.addEventListener('touchstart', handle2DPointerDown, { passive: false });
+    window.addEventListener('touchmove', handle2DPointerMove, { passive: false });
+    window.addEventListener('touchend', handle2DPointerUp);
+
+    // =========================================================================
+    // THREE.JS 3D CYLINDRICAL MUG RENDERER
+    // =========================================================================
+    let scene, camera, renderer, mugGroup, outerMaterial, innerMaterial, handleMaterial, mugTexture;
+    let steamParticles = null;
+    let orbitYaw = 0.42;      // 3/4 view showing front design and handle silhouette
+    let orbitPitch = 0.18;
+    let orbitRadius = 5.4;
+    let targetYaw = 0.42;
+    let targetPitch = 0.18;
+    let targetRadius = 5.4;
+    let isOrbitDragging = false;
+    let lastOrbitX = 0;
+    let lastOrbitY = 0;
+
+    function initThreeJS() {
+      const container = document.getElementById('threeContainer');
+      if (typeof THREE === 'undefined') {
+        container.innerHTML = '<div class="p-6 text-center text-xs text-slate-600">No se pudo cargar el motor 3D. Usa la Plantilla 2D.</div>';
+        return;
+      }
+
+      scene = new THREE.Scene();
+
+      const w = Math.max(200, container.clientWidth);
+      const h = Math.max(200, container.clientHeight);
+      camera = new THREE.PerspectiveCamera(34, w / h, 0.1, 100);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(w, h);
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+
+      // Studio Lighting
+      const amb = new THREE.AmbientLight(0xffffff, 0.68);
+      scene.add(amb);
+
+      const keyLight = new THREE.DirectionalLight(0xfffaf0, 0.78);
+      keyLight.position.set(4, 6, 5);
+      scene.add(keyLight);
+
+      const fillLight = new THREE.DirectionalLight(0xe0e7ff, 0.38);
+      fillLight.position.set(-5, 2, 3);
+      scene.add(fillLight);
+
+      const rimLight = new THREE.DirectionalLight(0xffffff, 0.42);
+      rimLight.position.set(0, 4, -6);
+      scene.add(rimLight);
+
+      // Build Mug Group
+      mugGroup = new THREE.Group();
+      scene.add(mugGroup);
+
+      const mugRadius = 0.88;
+      const mugHeight = 2.02;
+      const wallThick = 0.075;
+
+      // Dynamic CanvasTexture
+      mugTexture = new THREE.CanvasTexture(thermoCanvas);
+      mugTexture.encoding = THREE.sRGBEncoding;
+      mugTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      // Outer cylinder (seam at -Z where handle attaches, so Front is +Z!)
+      // Three.js CylinderGeometry UV seam starts at +Z (theta=0) going CCW; rotating Y by Math.PI puts seam at -Z (handle side) and center of texture (u=0.5) cleanly at +Z (front)!
+      const outerGeo = new THREE.CylinderGeometry(mugRadius, mugRadius * 0.985, mugHeight, 72, 1, true);
+      outerMaterial = new THREE.MeshStandardMaterial({
+        map: mugTexture,
+        roughness: 0.24,
+        metalness: 0.04
+      });
+      const outerMesh = new THREE.Mesh(outerGeo, outerMaterial);
+      outerMesh.rotation.y = Math.PI;
+      mugGroup.add(outerMesh);
+
+      // Ceramic interior & rim & bottom material
+      innerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.22,
+        metalness: 0.02,
+        side: THREE.DoubleSide
+      });
+
+      const innerGeo = new THREE.CylinderGeometry(mugRadius - wallThick, mugRadius - wallThick, mugHeight - 0.08, 64, 1, true);
+      const innerMesh = new THREE.Mesh(innerGeo, innerMaterial);
+      innerMesh.position.y = 0.04;
+      mugGroup.add(innerMesh);
+
+      // Inner bottom floor
+      const innerBottom = new THREE.Mesh(new THREE.CircleGeometry(mugRadius - wallThick, 48), innerMaterial);
+      innerBottom.rotation.x = -Math.PI / 2;
+      innerBottom.position.y = -mugHeight / 2 + 0.08;
+      mugGroup.add(innerBottom);
+
+      // Outer bottom base
+      const outerBottom = new THREE.Mesh(new THREE.CircleGeometry(mugRadius * 0.985, 48), innerMaterial);
+      outerBottom.rotation.x = Math.PI / 2;
+      outerBottom.position.y = -mugHeight / 2;
+      mugGroup.add(outerBottom);
+
+      // Smooth rounded top rim
+      const rimGeo = new THREE.TorusGeometry(mugRadius - wallThick / 2, wallThick / 2, 20, 72);
+      const rimMesh = new THREE.Mesh(rimGeo, innerMaterial);
+      rimMesh.rotation.x = Math.PI / 2;
+      rimMesh.position.y = mugHeight / 2;
+      mugGroup.add(rimMesh);
+
+      // C-shaped Handle on -Z (back seam) so front (+Z) shows center of design and left/right sides wrap cleanly
+      // Actually placing handle on +X or -Z? Let's put handle at -Z (back) OR let's check:
+      // In real sublimation mugs, the unprintable gap is right behind the handle!
+      // Because our outerMesh has seam at -Z (u=0 and u=1 meet at -Z), placing the handle at -Z means:
+      // - Looking at +Z ("Frente"): center of the 2D template!
+      // - Looking at -Z ("Asa"): handle & clean ceramic seam!
+      // - Looking at -X ("Izq.") and +X ("Der."): left and right sides of the design, with the handle visible in profile!
+      const handleCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0.56, -(mugRadius - 0.05)),
+        new THREE.Vector3(0, 0.56, -(mugRadius + 0.42)),
+        new THREE.Vector3(0, 0.0, -(mugRadius + 0.56)),
+        new THREE.Vector3(0, -0.54, -(mugRadius + 0.40)),
+        new THREE.Vector3(0, -0.56, -(mugRadius - 0.05))
+      ]);
+      const handleGeo = new THREE.TubeGeometry(handleCurve, 36, 0.095, 18, false);
+      handleMaterial = innerMaterial;
+      const handleMesh = new THREE.Mesh(handleGeo, handleMaterial);
+      mugGroup.add(handleMesh);
+
+      // Subtle soft contact shadow under mug
+      const shadowCanvas = document.createElement('canvas');
+      shadowCanvas.width = 256;
+      shadowCanvas.height = 256;
+      const sctx = shadowCanvas.getContext('2d');
+      const sgrad = sctx.createRadialGradient(128, 128, 22, 128, 128, 120);
+      sgrad.addColorStop(0, 'rgba(15, 23, 42, 0.24)');
+      sgrad.addColorStop(0.65, 'rgba(15, 23, 42, 0.08)');
+      sgrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+      sctx.fillStyle = sgrad;
+      sctx.fillRect(0, 0, 256, 256);
+      const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+      const shadowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.8, 2.8),
+        new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+      );
+      shadowPlane.rotation.x = -Math.PI / 2;
+      shadowPlane.position.y = -mugHeight / 2 - 0.02;
+      mugGroup.add(shadowPlane);
+
+      // Subtle steam puffs when mug is hot (> 60%)
+      const steamGroup = new THREE.Group();
+      const puffMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, depthWrite: false });
+      const puffs = [];
+      for (let i = 0; i < 6; i++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(0.14 + (i % 3) * 0.04, 12, 12), puffMat.clone());
+        puff.userData = {
+          phase: (i / 6) * Math.PI * 2,
+          angle: (i / 6) * Math.PI * 2,
+          radius: 0.18 + (i % 2) * 0.14
+        };
+        steamGroup.add(puff);
+        puffs.push(puff);
+      }
+      mugGroup.add(steamGroup);
+      steamParticles = puffs;
+
+      // Orbit interaction
+      const dom = renderer.domElement;
+      const onDown = (x, y) => {
+        isOrbitDragging = true;
+        lastOrbitX = x;
+        lastOrbitY = y;
+        if (state.autoRotate3D) toggleAutoRotate(false);
+      };
+      const onMove = (x, y) => {
+        if (!isOrbitDragging) return;
+        const dx = x - lastOrbitX;
+        const dy = y - lastOrbitY;
+        lastOrbitX = x;
+        lastOrbitY = y;
+        targetYaw -= dx * 0.011;
+        targetPitch = Math.max(-0.55, Math.min(0.85, targetPitch + dy * 0.009));
+      };
+      const onUp = () => { isOrbitDragging = false; };
+
+      dom.addEventListener('mousedown', e => onDown(e.clientX, e.clientY));
+      window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+      window.addEventListener('mouseup', onUp);
+
+      dom.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) onDown(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+      dom.addEventListener('touchmove', e => {
+        if (e.touches.length === 1 && isOrbitDragging) {
+          e.preventDefault();
+          onMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+      window.addEventListener('touchend', onUp);
+
+      dom.addEventListener('wheel', e => {
+        e.preventDefault();
+        targetRadius = Math.max(2.7, Math.min(6.4, targetRadius + e.deltaY * 0.003));
+      }, { passive: false });
+
+      window.addEventListener('resize', resizeThreeJS);
+
+      // Start render loop
+      let lastTime = performance.now();
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+
+        if (state.autoRotate3D && !isOrbitDragging) {
+          targetYaw += dt * 0.65;
+        }
+
+        // Smooth camera damping
+        orbitYaw += (targetYaw - orbitYaw) * 0.14;
+        orbitPitch += (targetPitch - orbitPitch) * 0.14;
+        orbitRadius += (targetRadius - orbitRadius) * 0.14;
+
+        const aspectBoost = camera.aspect < 1.15 ? (1.15 / Math.max(0.55, camera.aspect)) : 1;
+        const effRadius = orbitRadius * aspectBoost;
+        camera.position.x = Math.sin(orbitYaw) * Math.cos(orbitPitch) * effRadius;
+        camera.position.y = Math.sin(orbitPitch) * effRadius + 0.05;
+        camera.position.z = Math.cos(orbitYaw) * Math.cos(orbitPitch) * effRadius;
+        camera.lookAt(0, 0.02, 0);
+
+        // Animate steam when hot
+        if (steamParticles) {
+          const hotFactor = Math.max(0, (state.temperature - 58) / 42);
+          const t = now * 0.0012;
+          steamParticles.forEach(p => {
+            const cycle = ((t + p.userData.phase) % 2.4) / 2.4;
+            p.position.y = 1.05 + cycle * 0.85;
+            p.position.x = Math.cos(p.userData.angle + t * 0.8) * p.userData.radius * (1 + cycle * 0.6);
+            p.position.z = Math.sin(p.userData.angle + t * 0.8) * p.userData.radius * (1 + cycle * 0.6);
+            const fade = Math.sin(cycle * Math.PI);
+            p.material.opacity = hotFactor * fade * 0.22;
+            const sc = 0.7 + cycle * 0.9;
+            p.scale.set(sc, sc * 1.2, sc);
+          });
+        }
+
+        // Thermosensitive animation playback
+        if (state.isAnimatingThermo) {
+          state.temperature += state.thermoAnimDir * dt * 42;
+          if (state.temperature >= 100) {
+            state.temperature = 100;
+            state.thermoAnimDir = -1;
+          } else if (state.temperature <= 0) {
+            state.temperature = 0;
+            state.thermoAnimDir = 1;
+          }
+          syncThermoUI();
+          update3DTextureOnly();
+        }
+
+        renderer.render(scene, camera);
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function resizeThreeJS() {
+      if (!renderer || !camera) return;
+      const container = document.getElementById('threeContainer');
+      if (!container || container.clientWidth === 0 || container.clientHeight === 0) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function update3DTextureOnly() {
+      if (!mugTexture || !innerMaterial) return;
+      buildMugTextureCanvas();
+      mugTexture.needsUpdate = true;
+      innerMaterial.color.set(state.project.mugConfig.interiorColor || '#ffffff');
+      // Subtle matte finish when cold, glossy ceramic when hot
+      const t = state.temperature / 100;
+      outerMaterial.roughness = 0.44 - t * 0.24;
+    }
+
+    function renderAll() {
+      render2DEditor();
+      update3DTextureOnly();
+    }
+
+    // =========================================================================
+    // UI SYNCING (LAYERS, PROPERTIES, THERMO, CLIENT REVIEW)
+    // =========================================================================
+    function syncThermoUI() {
+      const val = Math.round(state.temperature);
+      const tempC = Math.round(20 + (val / 100) * 65);
+      document.getElementById('thermoSlider').value = val;
+      document.getElementById('thermoPercentLabel').textContent = `${val}%`;
+
+      const dot = document.getElementById('thermoDot');
+      const txt = document.getElementById('thermoStateText');
+      if (val <= 15) {
+        dot.className = 'w-2 h-2 rounded-full bg-sky-400';
+        txt.textContent = `Fría (${val}% • ${tempC}°C)`;
+      } else if (val >= 85) {
+        dot.className = 'w-2 h-2 rounded-full bg-orange-400';
+        txt.textContent = `Caliente (${val}% • ${tempC}°C)`;
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        txt.textContent = `Calentando (${val}% • ${tempC}°C)`;
+      }
+    }
+
+    function renderLayersList() {
+      const list = document.getElementById('layersList');
+      const countEl = document.getElementById('layerCountLabel');
+      const els = state.project.elements;
+      countEl.textContent = `${els.length} ${els.length === 1 ? 'capa' : 'capas'}`;
+
+      if (els.length === 0) {
+        list.innerHTML = '<div class="text-xs text-slate-400 text-center py-6 border border-dashed border-slate-200 rounded-xl">Aún no hay elementos en la taza.</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      // Display top layer first
+      for (let i = els.length - 1; i >= 0; i--) {
+        const el = els[i];
+        const isSel = el.id === state.selectedId;
+        const iconMap = { image: 'image', text: 'type', shape: 'shapes', qr: 'qr-code' };
+        const row = document.createElement('div');
+        row.className = `flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
+          isSel ? 'border-indigo-500 bg-indigo-50/70' : 'border-slate-200 hover:bg-slate-50'
+        }`;
+        row.innerHTML = `
+          <i data-lucide="${iconMap[el.type] || 'box'}" class="w-3.5 h-3.5 ${isSel ? 'text-indigo-600' : 'text-slate-400'} shrink-0"></i>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-medium text-slate-800 truncate">${escapeHtml(el.name || el.text || el.type)}</div>
+            ${el.visibleInCold ? '<span class="text-[10px] text-sky-600 font-medium">Visible en frío</span>' : ''}
+          </div>
+          <button type="button" data-action="vis" title="Mostrar/ocultar" class="p-1 rounded hover:bg-white text-slate-500">
+            <i data-lucide="${el.visible ? 'eye' : 'eye-off'}" class="w-3.5 h-3.5"></i>
+          </button>
+          <button type="button" data-action="lock" title="Bloquear/desbloquear" class="p-1 rounded hover:bg-white ${el.locked ? 'text-amber-600' : 'text-slate-400'}">
+            <i data-lucide="${el.locked ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+        row.addEventListener('click', e => {
+          const btn = e.target.closest('button');
+          if (btn) {
+            e.stopPropagation();
+            const act = btn.dataset.action;
+            if (act === 'vis') el.visible = !el.visible;
+            if (act === 'lock') el.locked = !el.locked;
+            pushHistory();
+            renderLayersList();
+            renderAll();
+            return;
+          }
+          state.selectedId = el.id;
+          syncPropertiesPanel();
+          renderLayersList();
+          render2DEditor();
+        });
+        list.appendChild(row);
+      }
+      lucide.createIcons();
+    }
+
+    function syncPropertiesPanel() {
+      const panel = document.getElementById('selectedElementPanel');
+      const notice = document.getElementById('noSelectionNotice');
+      const el = state.project.elements.find(e => e.id === state.selectedId);
+
+      if (!el) {
+        panel.classList.add('hidden');
+        notice.classList.remove('hidden');
+        return;
+      }
+
+      panel.classList.remove('hidden');
+      notice.classList.add('hidden');
+
+      const typeNames = { image: 'Imagen', text: 'Texto', shape: 'Figura', qr: 'Código QR' };
+      document.getElementById('propElementTypeTitle').textContent = typeNames[el.type] || 'Elemento';
+
+      // Toggle type-specific sections
+      document.getElementById('propTextSection').classList.toggle('hidden', el.type !== 'text');
+      document.getElementById('propShapeSection').classList.toggle('hidden', el.type !== 'shape');
+      document.getElementById('propQrSection').classList.toggle('hidden', el.type !== 'qr');
+
+      if (el.type === 'text') {
+        document.getElementById('propTextValue').value = el.text || '';
+        document.getElementById('propTextFont').value = el.fontFamily || 'Montserrat';
+        document.getElementById('propTextColor').value = el.color || '#0f172a';
+        document.getElementById('propTextBold').classList.toggle('bg-indigo-100', !!el.bold);
+        document.getElementById('propTextItalic').classList.toggle('bg-indigo-100', !!el.italic);
+      } else if (el.type === 'shape') {
+        document.getElementById('propShapeFill').value = el.fill || '#f43f5e';
+        document.getElementById('propShapeStroke').value = el.stroke || '#ffffff';
+      } else if (el.type === 'qr') {
+        document.getElementById('propQrData').value = el.qrData || '';
+        document.getElementById('propQrFg').value = el.fgColor || '#0f172a';
+        document.getElementById('propQrBg').value = el.bgColor || '#ffffff';
+      }
+
+      document.getElementById('propX').value = Math.round(el.x * 100);
+      document.getElementById('propY').value = Math.round(el.y * 100);
+
+      const scalePct = el.type === 'text' ? Math.round((el.scale || 1) * 100) : Math.round((el.w / 0.25) * 100);
+      document.getElementById('propScale').value = Math.min(260, Math.max(15, scalePct));
+      document.getElementById('propScaleVal').textContent = `${scalePct}%`;
+
+      document.getElementById('propRotation').value = Math.round(el.rotation || 0);
+      document.getElementById('propRotVal').textContent = `${Math.round(el.rotation || 0)}°`;
+
+      const opPct = Math.round((el.opacity ?? 1) * 100);
+      document.getElementById('propOpacity').value = opPct;
+      document.getElementById('propOpacityVal').textContent = `${opPct}%`;
+
+      document.getElementById('propVisibleCold').checked = !!el.visibleInCold;
+    }
+
+    function syncMugConfigUI() {
+      const cfg = state.project.mugConfig;
+      document.getElementById('projectTitleInput').value = state.project.projectName || '';
+      document.getElementById('mugWidthMm').value = cfg.widthMm;
+      document.getElementById('mugHeightMm').value = cfg.heightMm;
+      document.getElementById('mugBgColor').value = cfg.bgColor || '#ffffff';
+      document.getElementById('mugInteriorColor').value = cfg.interiorColor || '#ffffff';
+      document.getElementById('mugColdCoatColor').value = cfg.coldCoatColor || '#141419';
+      document.getElementById('printDimsBadge').textContent = `${cfg.widthMm} × ${cfg.heightMm} mm`;
+
+      const key = `${cfg.widthMm}x${cfg.heightMm}`;
+      const sel = document.getElementById('mugPresetSelect');
+      sel.value = ['200x85', '210x95', '220x105'].includes(key) ? key : 'custom';
+
+      document.querySelectorAll('.coat-swatch').forEach(btn => {
+        const active = btn.dataset.coat.toLowerCase() === (cfg.coldCoatColor || '').toLowerCase();
+        btn.classList.toggle('border-indigo-600', active);
+        btn.classList.toggle('border-slate-200', !active);
+      });
+    }
+
+    function syncClientReviewUI() {
+      const rev = state.project.clientReview || { status: 'pendiente', clientName: '', comments: [] };
+      document.getElementById('clientNameInput').value = rev.clientName || '';
+
+      const btnApp = document.getElementById('btnClientApprove');
+      const btnChg = document.getElementById('btnClientChanges');
+      btnApp.className = `py-2.5 px-2 rounded-xl border-2 text-xs font-semibold flex flex-col items-center gap-1 transition ${
+        rev.status === 'aprobado'
+          ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+          : 'border-slate-200 hover:border-emerald-400 text-slate-700'
+      }`;
+      btnChg.className = `py-2.5 px-2 rounded-xl border-2 text-xs font-semibold flex flex-col items-center gap-1 transition ${
+        rev.status === 'cambios'
+          ? 'border-amber-500 bg-amber-50 text-amber-800'
+          : 'border-slate-200 hover:border-amber-400 text-slate-700'
+      }`;
+
+      const labels = {
+        pendiente: 'Pendiente de revisión',
+        aprobado: 'Diseño Aprobado ✓',
+        cambios: 'Solicita modificaciones'
+      };
+      document.getElementById('clientStatusSummary').innerHTML =
+        `Estado actual: <span class="font-semibold ${rev.status === 'aprobado' ? 'text-emerald-700' : rev.status === 'cambios' ? 'text-amber-700' : 'text-slate-700'}">${labels[rev.status] || labels.pendiente}</span>`;
+
+      const list = document.getElementById('clientCommentsList');
+      document.getElementById('clientCommentsCount').textContent = rev.comments.length;
+
+      if (rev.comments.length === 0) {
+        list.innerHTML = '<div class="text-[11px] text-slate-400 italic">Sin observaciones registradas aún.</div>';
+      } else {
+        list.innerHTML = '';
+        rev.comments.forEach((c, idx) => {
+          const card = document.createElement('div');
+          card.className = 'p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1';
+          card.innerHTML = `
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold text-slate-800">${escapeHtml(c.author || 'Cliente')}</span>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10px] text-slate-400">${escapeHtml(c.time || '')}</span>
+                <button type="button" class="text-slate-400 hover:text-rose-600" title="Eliminar comentario">×</button>
+              </div>
+            </div>
+            <p class="text-slate-600 leading-snug">${escapeHtml(c.text)}</p>
+          `;
+          card.querySelector('button').addEventListener('click', () => {
+            rev.comments.splice(idx, 1);
+            scheduleAutoSave();
+            syncClientReviewUI();
+          });
+          list.appendChild(card);
+        });
+      }
+
+      // Update top bar badge for Designer Mode
+      const badge = document.getElementById('btnReviewBadge');
+      const countBadge = document.getElementById('reviewBadgeCount');
+      const hasFeedback = rev.comments.length > 0 || rev.status !== 'pendiente';
+      if (state.appMode === 'designer' && hasFeedback) {
+        badge.classList.remove('hidden');
+        badge.classList.add('inline-flex');
+        countBadge.textContent = rev.comments.length || '!';
+      } else {
+        badge.classList.add('hidden');
+        badge.classList.remove('inline-flex');
+      }
+    }
+
+    function syncAllUI() {
+      syncMugConfigUI();
+      syncThermoUI();
+      renderLayersList();
+      syncPropertiesPanel();
+      syncClientReviewUI();
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // =========================================================================
+    // VIEW MODES & APP MODES (DESIGNER VS CLIENT)
+    // =========================================================================
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      const v3 = document.getElementById('viewport3DWrap');
+      const v2 = document.getElementById('viewport2DWrap');
+      const camBar = document.getElementById('cameraControlsBar');
+
+      v3.classList.toggle('hidden', mode === '2d');
+      v2.classList.toggle('hidden', mode === '3d');
+      v2.classList.toggle('flex', mode !== '3d');
+      camBar.classList.toggle('hidden', mode === '2d');
+
+      const btns = { '3d': 'btnView3D', '2d': 'btnView2D', 'split': 'btnViewSplit' };
+      Object.entries(btns).forEach(([k, id]) => {
+        const b = document.getElementById(id);
+        const active = k === mode;
+        b.classList.toggle('bg-white', active);
+        b.classList.toggle('text-indigo-700', active);
+        b.classList.toggle('font-semibold', active);
+        b.classList.toggle('shadow-sm', active);
+        b.classList.toggle('text-slate-600', !active);
+      });
+
+      setTimeout(() => {
+        resizeThreeJS();
+        render2DEditor();
+      }, 30);
+    }
+
+    function setAppMode(mode) {
+      state.appMode = mode;
+      const isClient = mode === 'client';
+
+      document.getElementById('btnModeDesigner').className = isClient
+        ? 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1'
+        : 'px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-indigo-700 shadow-sm transition flex items-center gap-1';
+      document.getElementById('btnModeClient').className = isClient
+        ? 'px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-emerald-700 shadow-sm transition flex items-center gap-1'
+        : 'px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1';
+
+      const leftP = document.getElementById('leftPanel');
+      const rightD = document.getElementById('rightPanelDesigner');
+      const rightC = document.getElementById('rightPanelClient');
+      const mNavTools = document.getElementById('mNavTools');
+      const mNavPropsLabel = document.getElementById('mNavPropsLabel');
+
+      if (isClient) {
+        state.selectedId = null;
+        leftP.classList.add('hidden');
+        leftP.classList.remove('lg:flex');
+        rightD.classList.add('hidden');
+        rightD.classList.remove('lg:flex');
+        rightC.classList.remove('hidden');
+        rightC.classList.add('lg:flex');
+        mNavTools.classList.add('opacity-40', 'pointer-events-none');
+        mNavPropsLabel.textContent = 'Revisión';
+        setViewMode('3d');
+        showToast('Modo Cliente activado — diseño protegido', 'info');
+      } else {
+        leftP.classList.add('lg:flex');
+        rightD.classList.add('lg:flex');
+        rightC.classList.add('hidden');
+        rightC.classList.remove('lg:flex');
+        mNavTools.classList.remove('opacity-40', 'pointer-events-none');
+        mNavPropsLabel.textContent = 'Propiedades';
+        showToast('Modo Diseñador activado', 'info');
+      }
+
+      syncClientReviewUI();
+      setTimeout(() => {
+        resizeThreeJS();
+        renderAll();
+      }, 40);
+    }
+
+    function toggleAutoRotate(force) {
+      state.autoRotate3D = typeof force === 'boolean' ? force : !state.autoRotate3D;
+      const btn = document.getElementById('btnAutoRotate');
+      btn.classList.toggle('bg-indigo-600', state.autoRotate3D);
+      btn.classList.toggle('text-white', state.autoRotate3D);
+      btn.classList.toggle('bg-slate-100', !state.autoRotate3D);
+      btn.classList.toggle('text-slate-600', !state.autoRotate3D);
+    }
+
+    // =========================================================================
+    // ADDING ELEMENTS (IMAGES, TEXT, QR, SHAPES)
+    // =========================================================================
+    function addImageFromDataUrl(dataUrl, name, imgObj) {
+      const aspect = imgObj ? imgObj.width / imgObj.height : 1;
+      const { w, h } = getCanvasDims();
+      const canvasRatio = w / h;
+      const targetH = 0.52;
+      const targetW = Math.min(0.65, (targetH * aspect) / canvasRatio);
+
+      const el = {
+        id: uid('img'),
+        type: 'image',
+        name: name || 'Imagen',
+        src: dataUrl,
+        x: 0.5,
+        y: 0.5,
+        w: targetW,
+        h: targetH,
+        aspect,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+        visibleInCold: false
+      };
+      state.project.elements.push(el);
+      state.selectedId = el.id;
+      pushHistory();
+      syncAllUI();
+      renderAll();
+      if (state.viewMode === '3d') setViewMode('split');
+      showToast(`Imagen "${el.name}" agregada`, 'success');
+    }
+
+    function handleImageFilesUpload(files) {
+      Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            // Optimize oversized images (> 1400px) so JSON export stays light & fast
+            const maxDim = 1400;
+            let dataUrl = e.target.result;
+            if (img.width > maxDim || img.height > maxDim) {
+              const scale = maxDim / Math.max(img.width, img.height);
+              const c = document.createElement('canvas');
+              c.width = Math.round(img.width * scale);
+              c.height = Math.round(img.height * scale);
+              c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+              dataUrl = file.type === 'image/png' ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.88);
+              const optImg = new Image();
+              optImg.onload = () => {
+                imageCache.set(dataUrl, optImg);
+                addImageFromDataUrl(dataUrl, file.name.replace(/\.[^.]+$/, ''), optImg);
+              };
+              optImg.src = dataUrl;
+            } else {
+              imageCache.set(dataUrl, img);
+              addImageFromDataUrl(dataUrl, file.name.replace(/\.[^.]+$/, ''), img);
+            }
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function addTextElement(text, fontFamily, color) {
+      const el = {
+        id: uid('txt'),
+        type: 'text',
+        name: (text || 'Texto').slice(0, 20),
+        text: text || 'Tu texto aquí',
+        fontFamily: fontFamily || 'Montserrat',
+        fontSize: 64,
+        color: color || '#1e293b',
+        bold: false,
+        italic: false,
+        x: 0.5,
+        y: 0.5,
+        scale: 1,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+        visibleInCold: false
+      };
+      state.project.elements.push(el);
+      state.selectedId = el.id;
+      pushHistory();
+      syncAllUI();
+      renderAll();
+      showToast('Texto agregado a la taza', 'success');
+    }
+
+    function addShapeElement(shapeType) {
+      const { w, h } = getCanvasDims();
+      const ratio = w / h;
+      const sh = 0.24;
+      const sw = sh / ratio;
+      const names = {
+        heart: 'Corazón', star: 'Estrella', circle: 'Círculo',
+        roundedRect: 'Etiqueta', ribbon: 'Cinta', sparkle: 'Destello'
+      };
+      const el = {
+        id: uid('shp'),
+        type: 'shape',
+        name: names[shapeType] || 'Figura',
+        shape: shapeType,
+        fill: document.getElementById('newShapeFill').value,
+        stroke: document.getElementById('newShapeStroke').value,
+        strokeWidth: 6,
+        x: 0.5,
+        y: 0.5,
+        w: shapeType === 'ribbon' || shapeType === 'roundedRect' ? sw * 1.9 : sw,
+        h: sh,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+        visibleInCold: false
+      };
+      state.project.elements.push(el);
+      state.selectedId = el.id;
+      pushHistory();
+      syncAllUI();
+      renderAll();
+      showToast(`Figura "${el.name}" agregada`, 'success');
+    }
+
+    function addQrElement() {
+      const data = getCurrentQrInputData();
+      const fg = document.getElementById('qrFgColor').value;
+      const bg = document.getElementById('qrBgColor').value;
+      const { w, h } = getCanvasDims();
+      const ratio = w / h;
+      const qh = 0.42;
+      const qw = qh / ratio;
+      const el = {
+        id: uid('qr'),
+        type: 'qr',
+        name: `QR: ${data.slice(0, 18)}`,
+        qrData: data,
+        fgColor: fg,
+        bgColor: bg,
+        x: 0.78,
+        y: 0.5,
+        w: qw,
+        h: qh,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        locked: false,
+        visibleInCold: false
+      };
+      state.project.elements.push(el);
+      state.selectedId = el.id;
+      pushHistory();
+      syncAllUI();
+      renderAll();
+      showToast('Código QR real colocado en la taza', 'success');
+    }
+
+    // =========================================================================
+    // IMPORT & EXPORT (JSON, HIGH-RES PRINT PNG, COLD/HOT 3D PNG, CLIENT TXT)
+    // =========================================================================
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function sanitizeFilename(name) {
+      return (name || 'taza-magica')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'taza-magica';
+    }
+
+    function exportProjectJson(suffix = '') {
+      state.project.updatedAt = new Date().toISOString();
+      const json = JSON.stringify(state.project, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const base = sanitizeFilename(state.project.projectName);
+      downloadBlob(blob, `${base}${suffix}.json`);
+      showToast('Proyecto exportado (.json)', 'success');
+    }
+
+    function importProjectJsonFile(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed || !parsed.mugConfig || !Array.isArray(parsed.elements)) {
+            showToast('El archivo JSON no corresponde a un proyecto válido', 'error');
+            return;
+          }
+          state.project = parsed;
+          if (!state.project.clientReview) {
+            state.project.clientReview = { status: 'pendiente', clientName: '', comments: [] };
+          }
+          state.selectedId = null;
+          state.history = [];
+          state.historyIndex = -1;
+          preloadProjectImages(() => {
+            pushHistory();
+            syncAllUI();
+            renderAll();
+            showToast(`Proyecto "${state.project.projectName}" importado`, 'success');
+          });
+        } catch (err) {
+          showToast('Error al leer el archivo JSON', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function exportPrintTemplatePng() {
+      const { wMm, hMm } = getCanvasDims();
+      // ~300 DPI print resolution (approx 11.8 px/mm)
+      const hiW = Math.round(wMm * 11.81);
+      const hiH = Math.round(hMm * 11.81);
+      const hiCanvas = document.createElement('canvas');
+      const hiCtx = hiCanvas.getContext('2d');
+      renderArtworkToCanvas(hiCanvas, hiCtx, hiW, hiH, false);
+      hiCanvas.toBlob(blob => {
+        const base = sanitizeFilename(state.project.projectName);
+        downloadBlob(blob, `${base}-plantilla-impresion-${wMm}x${hMm}mm.png`);
+        showToast(`Plantilla de impresión (${hiW}×${hiH}px) exportada`, 'success');
+      }, 'image/png');
+    }
+
+    function export3DMugSnapshot(targetTemp, label) {
+      if (!renderer || !scene || !camera) {
+        showToast('Vista 3D no disponible para captura', 'warn');
+        return;
+      }
+      const prevTemp = state.temperature;
+      const wasAnimating = state.isAnimatingThermo;
+      state.isAnimatingThermo = false;
+      state.temperature = targetTemp;
+      update3DTextureOnly();
+      renderer.render(scene, camera);
+      const dataUrl = renderer.domElement.toDataURL('image/png');
+
+      // Restore previous state
+      state.temperature = prevTemp;
+      state.isAnimatingThermo = wasAnimating;
+      update3DTextureOnly();
+      renderer.render(scene, camera);
+
+      fetch(dataUrl)
+        .then(r => r.blob())
+        .then(blob => {
+          const base = sanitizeFilename(state.project.projectName);
+          downloadBlob(blob, `${base}-vista-${label}.png`);
+          showToast(`Imagen de taza ${label} exportada`, 'success');
+        });
+    }
+
+    function exportClientNotesTxt() {
+      const rev = state.project.clientReview;
+      const lines = [
+        `REVISIÓN DE DISEÑO — ${state.project.projectName}`,
+        `Fecha: ${new Date().toLocaleString('es-ES')}`,
+        `Cliente: ${rev.clientName || 'No especificado'}`,
+        `Estado: ${rev.status.toUpperCase()}`,
+        '',
+        'OBSERVACIONES:',
+        ...(rev.comments.length
+          ? rev.comments.map((c, i) => `${i + 1}. [${c.time}] ${c.author}: ${c.text}`)
+          : ['(Sin observaciones adicionales)'])
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const base = sanitizeFilename(state.project.projectName);
+      downloadBlob(blob, `${base}-observaciones-cliente.txt`);
+      showToast('Observaciones descargadas (.txt)', 'success');
+    }
+
+    // =========================================================================
+    // EVENT BINDINGS
+    // =========================================================================
+    function bindEvents() {
+      // Left panel tabs
+      document.querySelectorAll('.left-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.leftTab;
+          document.querySelectorAll('.left-tab-btn').forEach(b => {
+            const active = b.dataset.leftTab === tab;
+            b.className = active
+              ? 'left-tab-btn flex flex-col items-center justify-center py-2 rounded-lg text-[10px] font-semibold bg-white text-indigo-700 shadow-sm border border-slate-200/80'
+              : 'left-tab-btn flex flex-col items-center justify-center py-2 rounded-lg text-[10px] font-medium text-slate-600 hover:bg-white/70';
+          });
+          document.querySelectorAll('.left-tab-pane').forEach(p => p.classList.add('hidden'));
+          const map = { images: 'tabImages', text: 'tabText', qr: 'tabQr', shapes: 'tabShapes', layers: 'tabLayers' };
+          document.getElementById(map[tab]).classList.remove('hidden');
+        });
+      });
+
+      // Populate Quick Stickers
+      const stickers = [
+        { emoji: '☕', bg: '#fef3c7', name: 'Sticker Café' },
+        { emoji: '❤️', bg: '#ffe4e6', name: 'Sticker Amor' },
+        { emoji: '🎂', bg: '#fce7f3', name: 'Sticker Cumple' },
+        { emoji: '🌟', bg: '#e0e7ff', name: 'Sticker Estrella' },
+        { emoji: '🐾', bg: '#dcfce7', name: 'Sticker Huella' },
+        { emoji: '🎉', bg: '#ffedd5', name: 'Sticker Fiesta' }
+      ];
+      const stickerGrid = document.getElementById('quickStickersGrid');
+      stickers.forEach(s => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'p-2.5 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 flex flex-col items-center gap-1 transition';
+        b.innerHTML = `<span class="text-2xl leading-none">${s.emoji}</span><span class="text-[10px] text-slate-600">${s.name.replace('Sticker ', '')}</span>`;
+        b.addEventListener('click', () => {
+          const url = createStickerDataUrl(s.emoji, s.bg);
+          const img = new Image();
+          img.onload = () => {
+            imageCache.set(url, img);
+            addImageFromDataUrl(url, s.name, img);
+          };
+          img.src = url;
+        });
+        stickerGrid.appendChild(b);
+      });
+
+      // Image upload
+      document.getElementById('btnUploadImage').addEventListener('click', () => {
+        document.getElementById('fileInputImage').click();
+      });
+      document.getElementById('fileInputImage').addEventListener('change', e => {
+        if (e.target.files.length) handleImageFilesUpload(e.target.files);
+        e.target.value = '';
+      });
+
+      // Text creation
+      document.getElementById('newTextColor').addEventListener('input', e => {
+        document.getElementById('newTextColorHex').textContent = e.target.value;
+      });
+      document.getElementById('btnAddText').addEventListener('click', () => {
+        addTextElement(
+          document.getElementById('newTextInput').value.trim() || 'Tu texto aquí',
+          document.getElementById('newTextFont').value,
+          document.getElementById('newTextColor').value
+        );
+      });
+      document.querySelectorAll('.preset-text-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          addTextElement(btn.dataset.presetText, btn.dataset.presetFont, btn.dataset.presetColor);
+        });
+      });
+
+      // Shapes
+      document.querySelectorAll('.shape-add-btn').forEach(btn => {
+        btn.addEventListener('click', () => addShapeElement(btn.dataset.shape));
+      });
+
+      // QR Generator
+      document.getElementById('qrTypeSelect').addEventListener('change', e => {
+        const t = e.target.value;
+        document.getElementById('qrFieldStandard').classList.toggle('hidden', t === 'whatsapp');
+        document.getElementById('qrFieldWhatsapp').classList.toggle('hidden', t !== 'whatsapp');
+        const label = document.getElementById('qrInputLabel');
+        const inp = document.getElementById('qrContentInput');
+        if (t === 'url') {
+          label.textContent = 'URL del sitio web';
+          inp.placeholder = 'https://ejemplo.com';
+        } else if (t === 'social') {
+          label.textContent = 'Usuario (@cuenta) o enlace';
+          inp.placeholder = '@tu_tienda o https://tiktok.com/@...';
+        } else if (t === 'text') {
+          label.textContent = 'Texto o mensaje secreto';
+          inp.placeholder = 'Te quiero mucho...';
+        }
+        updateQrPanelPreview();
+      });
+      ['qrContentInput', 'qrWaPhone', 'qrWaMsg', 'qrFgColor', 'qrBgColor'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateQrPanelPreview);
+      });
+      document.getElementById('btnAddQrToMug').addEventListener('click', addQrElement);
+      document.getElementById('btnDownloadQr').addEventListener('click', () => {
+        const hi = document.createElement('canvas');
+        hi.width = 600;
+        hi.height = 600;
+        drawQrToCanvas(
+          hi.getContext('2d'), 300, 300, 600, 600,
+          getCurrentQrInputData(),
+          document.getElementById('qrFgColor').value,
+          document.getElementById('qrBgColor').value
+        );
+        hi.toBlob(blob => {
+          downloadBlob(blob, 'codigo-qr-taza.png');
+          showToast('Código QR descargado (PNG)', 'success');
+        }, 'image/png');
+      });
+
+      // View mode buttons
+      document.getElementById('btnView3D').addEventListener('click', () => setViewMode('3d'));
+      document.getElementById('btnView2D').addEventListener('click', () => setViewMode('2d'));
+      document.getElementById('btnViewSplit').addEventListener('click', () => setViewMode('split'));
+      document.getElementById('chkShowGuides').addEventListener('change', e => {
+        state.showGuides = e.target.checked;
+        render2DEditor();
+      });
+
+      // 3D Camera Angles & Zoom
+      document.querySelectorAll('.cam-angle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          toggleAutoRotate(false);
+          const a = btn.dataset.angle;
+          if (a === 'front') { targetYaw = 0; targetPitch = 0.14; }
+          if (a === 'left') { targetYaw = -Math.PI / 2; targetPitch = 0.14; }
+          if (a === 'right') { targetYaw = Math.PI / 2; targetPitch = 0.14; }
+          if (a === 'back') { targetYaw = Math.PI; targetPitch = 0.14; }
+        });
+      });
+      document.getElementById('btnAutoRotate').addEventListener('click', () => toggleAutoRotate());
+      document.getElementById('btnZoomIn').addEventListener('click', () => {
+        targetRadius = Math.max(2.7, targetRadius - 0.45);
+      });
+      document.getElementById('btnZoomOut').addEventListener('click', () => {
+        targetRadius = Math.min(6.4, targetRadius + 0.45);
+      });
+
+      // Thermosensitive Controls
+      document.getElementById('thermoSlider').addEventListener('input', e => {
+        state.isAnimatingThermo = false;
+        syncAnimateBtn();
+        state.temperature = Number(e.target.value);
+        syncThermoUI();
+        update3DTextureOnly();
+      });
+      document.getElementById('btnSetCold').addEventListener('click', () => {
+        state.isAnimatingThermo = false;
+        syncAnimateBtn();
+        state.temperature = 0;
+        syncThermoUI();
+        update3DTextureOnly();
+      });
+      document.getElementById('btnSetHot').addEventListener('click', () => {
+        state.isAnimatingThermo = false;
+        syncAnimateBtn();
+        state.temperature = 100;
+        syncThermoUI();
+        update3DTextureOnly();
+      });
+      document.getElementById('btnAnimateThermo').addEventListener('click', () => {
+        state.isAnimatingThermo = !state.isAnimatingThermo;
+        if (state.isAnimatingThermo && state.temperature >= 98) state.thermoAnimDir = -1;
+        if (state.isAnimatingThermo && state.temperature <= 2) state.thermoAnimDir = 1;
+        syncAnimateBtn();
+      });
+
+      // Selected Element Property Controls
+      const mutateSelected = (fn, commit = false) => {
+        const el = state.project.elements.find(e => e.id === state.selectedId);
+        if (!el) return;
+        fn(el);
+        renderAll();
+        if (commit) {
+          pushHistory();
+          renderLayersList();
+        }
+      };
+
+      document.getElementById('propTextValue').addEventListener('input', e => {
+        mutateSelected(el => { el.text = e.target.value; el.name = e.target.value.slice(0, 20) || 'Texto'; });
+      });
+      document.getElementById('propTextValue').addEventListener('change', () => { pushHistory(); renderLayersList(); });
+      document.getElementById('propTextFont').addEventListener('change', e => mutateSelected(el => { el.fontFamily = e.target.value; }, true));
+      document.getElementById('propTextColor').addEventListener('input', e => mutateSelected(el => { el.color = e.target.value; }));
+      document.getElementById('propTextColor').addEventListener('change', () => pushHistory());
+      document.getElementById('propTextBold').addEventListener('click', () => {
+        mutateSelected(el => { el.bold = !el.bold; }, true);
+        syncPropertiesPanel();
+      });
+      document.getElementById('propTextItalic').addEventListener('click', () => {
+        mutateSelected(el => { el.italic = !el.italic; }, true);
+        syncPropertiesPanel();
+      });
+
+      document.getElementById('propShapeFill').addEventListener('input', e => mutateSelected(el => { el.fill = e.target.value; }));
+      document.getElementById('propShapeFill').addEventListener('change', () => pushHistory());
+      document.getElementById('propShapeStroke').addEventListener('input', e => mutateSelected(el => { el.stroke = e.target.value; }));
+      document.getElementById('propShapeStroke').addEventListener('change', () => pushHistory());
+
+      document.getElementById('propQrData').addEventListener('input', e => mutateSelected(el => { el.qrData = e.target.value; el.name = `QR: ${e.target.value.slice(0, 18)}`; }));
+      document.getElementById('propQrData').addEventListener('change', () => { pushHistory(); renderLayersList(); });
+      document.getElementById('propQrFg').addEventListener('input', e => mutateSelected(el => { el.fgColor = e.target.value; }));
+      document.getElementById('propQrFg').addEventListener('change', () => pushHistory());
+      document.getElementById('propQrBg').addEventListener('input', e => mutateSelected(el => { el.bgColor = e.target.value; }));
+      document.getElementById('propQrBg').addEventListener('change', () => pushHistory());
+
+      document.getElementById('propX').addEventListener('input', e => {
+        mutateSelected(el => { el.x = Number(e.target.value) / 100; clampElementInsidePrintable(el); });
+      });
+      document.getElementById('propX').addEventListener('change', () => pushHistory());
+      document.getElementById('propY').addEventListener('input', e => {
+        mutateSelected(el => { el.y = Number(e.target.value) / 100; clampElementInsidePrintable(el); });
+      });
+      document.getElementById('propY').addEventListener('change', () => pushHistory());
+
+      document.getElementById('propScale').addEventListener('input', e => {
+        const pct = Number(e.target.value);
+        document.getElementById('propScaleVal').textContent = `${pct}%`;
+        mutateSelected(el => {
+          if (el.type === 'text') {
+            el.scale = pct / 100;
+          } else {
+            const oldW = el.w || 0.2;
+            const newW = Math.min(0.95, Math.max(0.04, 0.25 * (pct / 100)));
+            const ratio = newW / oldW;
+            el.w = newW;
+            el.h = Math.min(0.95, Math.max(0.05, (el.h || 0.2) * ratio));
+          }
+        });
+      });
+      document.getElementById('propScale').addEventListener('change', () => pushHistory());
+
+      document.getElementById('propRotation').addEventListener('input', e => {
+        const deg = Number(e.target.value);
+        document.getElementById('propRotVal').textContent = `${deg}°`;
+        mutateSelected(el => { el.rotation = deg; });
+      });
+      document.getElementById('propRotation').addEventListener('change', () => pushHistory());
+
+      document.getElementById('propOpacity').addEventListener('input', e => {
+        const pct = Number(e.target.value);
+        document.getElementById('propOpacityVal').textContent = `${pct}%`;
+        mutateSelected(el => { el.opacity = pct / 100; });
+      });
+      document.getElementById('propOpacity').addEventListener('change', () => pushHistory());
+
+      document.getElementById('propVisibleCold').addEventListener('change', e => {
+        mutateSelected(el => { el.visibleInCold = e.target.checked; }, true);
+      });
+
+      document.getElementById('btnDeleteEl').addEventListener('click', () => {
+        const idx = state.project.elements.findIndex(e => e.id === state.selectedId);
+        if (idx === -1) return;
+        state.project.elements.splice(idx, 1);
+        state.selectedId = null;
+        pushHistory();
+        syncAllUI();
+        renderAll();
+        showToast('Elemento eliminado');
+      });
+
+      document.getElementById('btnDuplicateEl').addEventListener('click', () => {
+        const el = state.project.elements.find(e => e.id === state.selectedId);
+        if (!el) return;
+        const copy = JSON.parse(JSON.stringify(el));
+        copy.id = uid(el.type);
+        copy.name = `${el.name || el.type} (copia)`;
+        copy.x = Math.min(0.9, el.x + 0.04);
+        copy.y = Math.min(0.9, el.y + 0.04);
+        state.project.elements.push(copy);
+        state.selectedId = copy.id;
+        pushHistory();
+        syncAllUI();
+        renderAll();
+      });
+
+      document.getElementById('btnLayerUp').addEventListener('click', () => {
+        const els = state.project.elements;
+        const idx = els.findIndex(e => e.id === state.selectedId);
+        if (idx === -1 || idx === els.length - 1) return;
+        [els[idx], els[idx + 1]] = [els[idx + 1], els[idx]];
+        pushHistory();
+        renderLayersList();
+        renderAll();
+      });
+
+      document.getElementById('btnLayerDown').addEventListener('click', () => {
+        const els = state.project.elements;
+        const idx = els.findIndex(e => e.id === state.selectedId);
+        if (idx <= 0) return;
+        [els[idx], els[idx - 1]] = [els[idx - 1], els[idx]];
+        pushHistory();
+        renderLayersList();
+        renderAll();
+      });
+
+      document.getElementById('btnCenterEl').addEventListener('click', () => {
+        mutateSelected(el => { el.x = 0.5; el.y = 0.5; }, true);
+        syncPropertiesPanel();
+      });
+
+      // Mug Configuration
+      document.getElementById('projectTitleInput').addEventListener('input', e => {
+        state.project.projectName = e.target.value;
+        scheduleAutoSave();
+      });
+      document.getElementById('mugPresetSelect').addEventListener('change', e => {
+        const v = e.target.value;
+        if (v !== 'custom') {
+          const [w, h] = v.split('x').map(Number);
+          state.project.mugConfig.widthMm = w;
+          state.project.mugConfig.heightMm = h;
+          pushHistory();
+          syncMugConfigUI();
+          renderAll();
+        }
+      });
+      document.getElementById('mugWidthMm').addEventListener('change', e => {
+        state.project.mugConfig.widthMm = Math.min(250, Math.max(120, Number(e.target.value) || 200));
+        pushHistory();
+        syncMugConfigUI();
+        renderAll();
+      });
+      document.getElementById('mugHeightMm').addEventListener('change', e => {
+        state.project.mugConfig.heightMm = Math.min(125, Math.max(50, Number(e.target.value) || 85));
+        pushHistory();
+        syncMugConfigUI();
+        renderAll();
+      });
+      document.getElementById('mugBgColor').addEventListener('input', e => {
+        state.project.mugConfig.bgColor = e.target.value;
+        renderAll();
+      });
+      document.getElementById('mugBgColor').addEventListener('change', () => pushHistory());
+      document.getElementById('mugInteriorColor').addEventListener('input', e => {
+        state.project.mugConfig.interiorColor = e.target.value;
+        update3DTextureOnly();
+      });
+      document.getElementById('mugInteriorColor').addEventListener('change', () => pushHistory());
+      document.getElementById('mugColdCoatColor').addEventListener('input', e => {
+        state.project.mugConfig.coldCoatColor = e.target.value;
+        syncMugConfigUI();
+        update3DTextureOnly();
+      });
+      document.getElementById('mugColdCoatColor').addEventListener('change', () => pushHistory());
+      document.querySelectorAll('.coat-swatch').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.project.mugConfig.coldCoatColor = btn.dataset.coat;
+          pushHistory();
+          syncMugConfigUI();
+          update3DTextureOnly();
+        });
+      });
+
+      // Top Bar Actions (Desktop & Mobile)
+      const openNewModal = () => document.getElementById('newProjectModal').classList.remove('hidden');
+      const openExportModal = () => document.getElementById('exportModal').classList.remove('hidden');
+      const triggerImport = () => document.getElementById('fileInputJson').click();
+
+      document.getElementById('btnNewProject').addEventListener('click', openNewModal);
+      document.getElementById('mBtnNew').addEventListener('click', openNewModal);
+      document.getElementById('btnImportJson').addEventListener('click', triggerImport);
+      document.getElementById('mBtnImport').addEventListener('click', triggerImport);
+      document.getElementById('btnOpenExportModal').addEventListener('click', openExportModal);
+      document.getElementById('mBtnExport').addEventListener('click', openExportModal);
+      document.getElementById('btnUndo').addEventListener('click', undo);
+      document.getElementById('mBtnUndo').addEventListener('click', undo);
+      document.getElementById('btnRedo').addEventListener('click', redo);
+      document.getElementById('mBtnRedo').addEventListener('click', redo);
+
+      document.getElementById('fileInputJson').addEventListener('change', e => {
+        if (e.target.files[0]) importProjectJsonFile(e.target.files[0]);
+        e.target.value = '';
+      });
+
+      // Modals
+      document.getElementById('btnCloseExportModal').addEventListener('click', () => document.getElementById('exportModal').classList.add('hidden'));
+      document.getElementById('btnDoExportJson').addEventListener('click', () => {
+        exportProjectJson();
+        document.getElementById('exportModal').classList.add('hidden');
+      });
+      document.getElementById('btnDoExportPrintPng').addEventListener('click', () => {
+        exportPrintTemplatePng();
+        document.getElementById('exportModal').classList.add('hidden');
+      });
+      document.getElementById('btnDoExportColdPng').addEventListener('click', () => {
+        export3DMugSnapshot(0, 'fria');
+        document.getElementById('exportModal').classList.add('hidden');
+      });
+      document.getElementById('btnDoExportHotPng').addEventListener('click', () => {
+        export3DMugSnapshot(100, 'caliente');
+        document.getElementById('exportModal').classList.add('hidden');
+      });
+
+      document.getElementById('btnCloseNewModal').addEventListener('click', () => document.getElementById('newProjectModal').classList.add('hidden'));
+      document.getElementById('btnStartBlank').addEventListener('click', () => {
+        state.project = createBlankProject();
+        state.selectedId = null;
+        state.history = [];
+        state.historyIndex = -1;
+        pushHistory();
+        syncAllUI();
+        renderAll();
+        document.getElementById('newProjectModal').classList.add('hidden');
+        showToast('Nuevo proyecto en blanco creado', 'info');
+      });
+      document.getElementById('btnLoadDemo').addEventListener('click', () => {
+        state.project = createDemoProject();
+        state.selectedId = null;
+        state.history = [];
+        state.historyIndex = -1;
+        preloadProjectImages(() => {
+          pushHistory();
+          syncAllUI();
+          renderAll();
+          document.getElementById('newProjectModal').classList.add('hidden');
+          showToast('Proyecto de demostración cargado', 'success');
+        });
+      });
+
+      // App Mode Switch
+      document.getElementById('btnModeDesigner').addEventListener('click', () => setAppMode('designer'));
+      document.getElementById('btnModeClient').addEventListener('click', () => setAppMode('client'));
+
+      // Client Review Mode Events
+      document.getElementById('clientNameInput').addEventListener('input', e => {
+        state.project.clientReview.clientName = e.target.value;
+        scheduleAutoSave();
+      });
+      document.getElementById('btnClientApprove').addEventListener('click', () => {
+        state.project.clientReview.status = 'aprobado';
+        scheduleAutoSave();
+        syncClientReviewUI();
+        showToast('Diseño marcado como aprobado', 'success');
+      });
+      document.getElementById('btnClientChanges').addEventListener('click', () => {
+        state.project.clientReview.status = 'cambios';
+        scheduleAutoSave();
+        syncClientReviewUI();
+        showToast('Estado actualizado: solicita modificaciones', 'warn');
+      });
+      document.querySelectorAll('.quick-note-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const ta = document.getElementById('clientCommentInput');
+          ta.value = ta.value ? `${ta.value}. ${chip.dataset.quickNote}` : chip.dataset.quickNote;
+          ta.focus();
+        });
+      });
+      document.getElementById('btnAddClientComment').addEventListener('click', () => {
+        const ta = document.getElementById('clientCommentInput');
+        const txt = ta.value.trim();
+        if (!txt) {
+          showToast('Escribe una observación primero', 'warn');
+          return;
+        }
+        state.project.clientReview.comments.push({
+          author: state.project.clientReview.clientName.trim() || 'Cliente',
+          text: txt,
+          time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        });
+        ta.value = '';
+        scheduleAutoSave();
+        syncClientReviewUI();
+        showToast('Observación agregada', 'success');
+      });
+      document.getElementById('btnExportClientProject').addEventListener('click', () => exportProjectJson('-revision-cliente'));
+      document.getElementById('btnExportClientNotesTxt').addEventListener('click', exportClientNotesTxt);
+
+      // Designer Review Badge Modal
+      document.getElementById('btnReviewBadge').addEventListener('click', () => {
+        const rev = state.project.clientReview;
+        const body = document.getElementById('reviewModalBody');
+        body.innerHTML = `
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+            <span class="font-semibold text-slate-700">Cliente: ${escapeHtml(rev.clientName || 'No especificado')}</span>
+            <span class="px-2 py-0.5 rounded-full font-semibold ${
+              rev.status === 'aprobado' ? 'bg-emerald-100 text-emerald-800' :
+              rev.status === 'cambios' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'
+            }">${escapeHtml(rev.status.toUpperCase())}</span>
+          </div>
+          <div class="space-y-2">
+            ${rev.comments.length
+              ? rev.comments.map(c => `<div class="p-2.5 rounded-lg border border-slate-200"><div class="font-semibold text-slate-800">${escapeHtml(c.author)} <span class="text-slate-400 font-normal">(${escapeHtml(c.time)})</span></div><p class="text-slate-600 mt-0.5">${escapeHtml(c.text)}</p></div>`).join('')
+              : '<p class="text-slate-400 italic">Sin comentarios escritos.</p>'
+            }
+          </div>
+        `;
+        document.getElementById('reviewSummaryModal').classList.remove('hidden');
+      });
+      document.getElementById('btnCloseReviewModal').addEventListener('click', () => {
+        document.getElementById('reviewSummaryModal').classList.add('hidden');
+      });
+
+      // Mobile menu & panel navigation
+      document.getElementById('btnMobileMenu').addEventListener('click', () => {
+        document.getElementById('mobileActionBar').classList.toggle('hidden');
+      });
+
+      const setMobilePanel = panel => {
+        state.mobilePanel = panel;
+        const leftP = document.getElementById('leftPanel');
+        const rightD = document.getElementById('rightPanelDesigner');
+        const rightC = document.getElementById('rightPanelClient');
+        const activeRight = state.appMode === 'client' ? rightC : rightD;
+
+        leftP.classList.toggle('hidden', panel !== 'tools');
+        leftP.classList.toggle('flex', panel === 'tools');
+        leftP.classList.toggle('fixed', panel === 'tools');
+        leftP.classList.toggle('inset-y-14', panel === 'tools');
+        leftP.classList.toggle('left-0', panel === 'tools');
+        leftP.classList.toggle('w-72', panel === 'tools');
+        leftP.classList.toggle('shadow-2xl', panel === 'tools');
+
+        activeRight.classList.toggle('hidden', panel !== 'props');
+        activeRight.classList.toggle('flex', panel === 'props');
+        activeRight.classList.toggle('fixed', panel === 'props');
+        activeRight.classList.toggle('inset-y-14', panel === 'props');
+        activeRight.classList.toggle('right-0', panel === 'props');
+        activeRight.classList.toggle('shadow-2xl', panel === 'props');
+      };
+
+      document.getElementById('mNavTools').addEventListener('click', () => setMobilePanel(state.mobilePanel === 'tools' ? 'stage' : 'tools'));
+      document.getElementById('mNavStage').addEventListener('click', () => setMobilePanel('stage'));
+      document.getElementById('mNavProps').addEventListener('click', () => setMobilePanel(state.mobilePanel === 'props' ? 'stage' : 'props'));
+
+      // Keyboard shortcuts (Undo, Redo, Delete)
+      window.addEventListener('keydown', e => {
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redo(); else undo();
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          redo();
+        } else if ((e.key === 'Delete' || e.key === 'Backspace') && state.appMode === 'designer' && state.selectedId) {
+          e.preventDefault();
+          document.getElementById('btnDeleteEl').click();
+        }
+      });
+    }
+
+    function syncAnimateBtn() {
+      const lbl = document.getElementById('animateLabel');
+      const icon = document.getElementById('animateIcon');
+      lbl.textContent = state.isAnimatingThermo ? 'Pausar' : 'Animar cambio';
+      icon.setAttribute('data-lucide', state.isAnimatingThermo ? 'pause' : 'play');
+      lucide.createIcons();
+    }
+
+    // =========================================================================
+    // BOOTSTRAP
+    // =========================================================================
+    function init() {
+      state.project = loadSavedProject() || createDemoProject();
+      bindEvents();
+      initThreeJS();
+      updateQrPanelPreview();
+      lucide.createIcons();
+
+      preloadProjectImages(() => {
+        pushHistory();
+        syncAllUI();
+        // Start in Split view on wide desktops so both 3D mug & 2D editable template are immediately visible!
+        if (window.innerWidth >= 1100) {
+          setViewMode('split');
+        } else {
+          setViewMode('3d');
+        }
+        renderAll();
+      });
+    }
+
+    window.addEventListener('load', init);
+  })();
+  </script>
+</body>
+</html>
